@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import engine
+from app.models import task
+
+task.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="REM AI")
 
