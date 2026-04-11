@@ -19,7 +19,7 @@ Whether you're striving to meet a deadline or managing a packed week, SleepSync 
 ## Tech Stack 
 | Layer      | Technology       |
 |------------|------------------|
-| Frontend   | React     |
+| Frontend   | Node.js          |
 | Backend    | Python + FastAPI |
 | AI         | Open API         |
 | Styling    | Tailwind CSS     |
