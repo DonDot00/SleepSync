@@ -42,35 +42,7 @@ cat > backend/app/database.py << 'EOF'
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./rem_ai.db"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-class Base(DeclarativeBase):
-    pass
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-EOF
-
-# Models
-cat > backend/app/models/task.py << 'EOF'
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float
-from sqlalchemy.sql import func
-from app.database import Base
-
-class Task(Base):
-    __tablename__ = "tasks"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    duration_minutes = Column(Integer, nullable=False)
-    priority = Column(String, default="medium")  # high / medium / low
+SQLA
     task_type = Column(String, default="flexible")  # fixed / flexible / sleep / free
     fixed_time = Column(String, nullable=True)  # "09:00" if fixed
     is_completed = Column(Boolean, default=False)
