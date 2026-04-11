@@ -7,7 +7,10 @@ echo "🚀 Scaffolding REM AI project..."
 
 # ─────────────────────────────────────
 # BACKEND
-# ─────────────────────────────────────
+
+
+
+
 mkdir -p backend/app/{routers,models,services,schemas}
 
 # Entry point
