@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import "./App.css";
 
 // Font: Outfit (body) + Syne (headings/accents)
@@ -14,7 +14,6 @@ const TODAY_EVENTS = [
   { time: "7:00pm", duration: "7:00 – 8:30pm", title: "Team dinner", type: "pink", badge: null },
 ];
 
-// iunitial chat messages to show some context and examples of how the assistant can help with scheduling and sleep recommendations. These can be adjusted or expanded as needed.
 const INITIAL_MESSAGES = [
   { from: "ai", text: "Hey! You have a big day ahead. I've protected your wind-down window — aim to wrap up by 10pm tonight." },
   { from: "user", text: "Can you move my run to 6am?" },
@@ -86,6 +85,37 @@ function MonthCalendar() {
 }
 
 function TodaySchedule() {
+  const [events, setEvents] = useState(TODAY_EVENTS);
+  const dragIndex = useRef(null);
+  const [dragOver, setDragOver] = useState(null);
+
+  const handleDragStart = (i) => {
+    dragIndex.current = i;
+  };
+
+  const handleDragOver = (e, i) => {
+    e.preventDefault();
+    setDragOver(i);
+  };
+
+  const handleDrop = (i) => {
+    if (dragIndex.current === null || dragIndex.current === i) {
+      setDragOver(null);
+      return;
+    }
+    const updated = [...events];
+    const [moved] = updated.splice(dragIndex.current, 1);
+    updated.splice(i, 0, moved);
+    setEvents(updated);
+    dragIndex.current = null;
+    setDragOver(null);
+  };
+
+  const handleDragEnd = () => {
+    dragIndex.current = null;
+    setDragOver(null);
+  };
+
   return (
     <div className="center-panel">
       <div className="today-header">
@@ -93,9 +123,17 @@ function TodaySchedule() {
         <span className="today-sub">4 events · Bedtime by 11:00pm</span>
       </div>
       <div className="timeline">
-        {TODAY_EVENTS.map((ev, i) => (
-          <div key={i} className="time-row">
-            <div className="time-label">{ev.time.replace(":00", "").replace("am","am").replace("pm","pm")}</div>
+        {events.map((ev, i) => (
+          <div
+            key={ev.title}
+            className={`time-row${dragOver === i ? " drag-over" : ""}`}
+            draggable
+            onDragStart={() => handleDragStart(i)}
+            onDragOver={(e) => handleDragOver(e, i)}
+            onDrop={() => handleDrop(i)}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="time-label">{ev.time}</div>
             <div className={`event-block ev-${ev.type}`}>
               <div className="event-title">{ev.title}</div>
               <div className="event-time">{ev.duration}</div>

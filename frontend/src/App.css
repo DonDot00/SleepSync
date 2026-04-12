@@ -77,7 +77,7 @@ body {
 /* ── Main 3-column layout ── */
 .main {
   display: grid;
-  grid-template-columns: 175px 1fr 210px;
+  grid-template-columns: 200px 1fr 240px;
   height: 100%;
   overflow: hidden;
 }
@@ -223,12 +223,28 @@ body {
   gap: 6px;
 }
 
+/* ── Drag and drop ── */
 .time-row {
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 8px;
   align-items: start;
   min-height: 44px;
+  cursor: grab;
+  transition: opacity 0.15s, transform 0.15s;
+  border-radius: 6px;
+}
+
+.time-row:active {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+.time-row.drag-over {
+  outline: 1.5px dashed #534ab7;
+  outline-offset: 3px;
+  background: rgba(83, 74, 183, 0.08);
+  border-radius: 8px;
 }
 
 .time-label {
@@ -285,12 +301,13 @@ body {
 
 /* ── AI Chat ── */
 .chat-section {
-  flex: 1;
+  flex: 0 0 42%;
   padding: 16px;
   border-bottom: 0.5px solid #1e1830;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .chat-messages {
@@ -365,11 +382,13 @@ body {
 
 /* ── Sleep health ── */
 .sleep-section {
+  flex: 1;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .sleep-ring-row {
@@ -546,6 +565,7 @@ body {
   font-size: 9px;
   color: #4a4060;
 }
+
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2440; border-radius: 2px; }
