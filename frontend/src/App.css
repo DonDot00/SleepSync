@@ -1,115 +1,37 @@
-body {
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
   margin: 0;
-  background: #080610;
-  color: white;
-  font-family: sans-serif;
+  padding: 0;
 }
 
-.app {
-  display: grid;
-  grid-template-rows: 48px 1fr;
-  height: 100vh;
+body {
+  background: #060610;
+  color: #e2e8f0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.topbar {
-  background: #13101f;
-  padding: 10px;
+::-webkit-scrollbar {
+  width: 4px;
 }
 
-.main {
-  display: grid;
-  grid-template-columns: 200px 1fr 250px;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* LEFT */
-.left-panel {
-  border-right: 1px solid #222;
-  padding: 10px;
+::-webkit-scrollbar-thumb {
+  background: #1a1a2e;
+  border-radius: 2px;
 }
 
-.month-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-}
-
-.day-cell {
-  padding: 6px;
-}
-
-/* CENTER */
-.center-panel {
-  position: relative;
-}
-
-.cal-scroll {
-  height: 100%;
-  overflow-y: auto;
-}
-
-.hour-row {
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  height: 60px;
-  border-bottom: 1px solid #222;
-}
-
-.hour-slot {
-  border-left: 1px solid #222;
-}
-
-.events-layer {
-  position: absolute;
-  top: 0;
-  left: 40px;
-  right: 0;
-}
-
-/* EVENTS */
-.cal-event {
-  background: #2a2050;
-  border-radius: 6px;
-  padding: 5px;
-  cursor: grab;
-}
-
-/* NOW LINE */
-.time-now-line {
-  position: absolute;
-  left: 40px;
-  right: 0;
-  height: 2px;
-  background: #7f77dd;
-}
-
-.time-now-dot {
-  width: 8px;
-  height: 8px;
-  background: #7f77dd;
-  border-radius: 50%;
-  position: absolute;
-  left: -4px;
-  top: -3px;
-}
-
-/* RIGHT */
-.chat-section {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-messages {
-  flex: 1;
-}
-
-.chat-input-row {
-  display: flex;
-}
-
-.chat-input {
-  flex: 1;
-}
-
-.send-btn {
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.3);
   cursor: pointer;
+}
+
+select option {
+  background: #0d0d1a;
+  color: #e2e8f0;
 }
