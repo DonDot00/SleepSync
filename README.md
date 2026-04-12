@@ -48,7 +48,6 @@ Whether you're striving to meet a deadline or managing a packed week, SleepSync 
 - [Why SleepSync?](#why-sleepsync)
 - [Features](#features)
 - [How It Works](#how-it-works)
-- [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Setup & Installation](#setup--installation)
 - [Screenshots](#screenshots)
@@ -137,50 +136,6 @@ SleepSync is built around three principles from sleep research:
 ```
 
 ---
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                     Browser                         │
-│                                                     │
-│   React + Vite frontend                             │
-│   ┌─────────────┐  ┌──────────────┐  ┌──────────┐  │
-│   │  Calendar   │  │  AI Chat     │  │  Sleep   │  │
-│   │ (drag/drop) │  │  Panel       │  │  Health  │  │
-│   └──────┬──────┘  └──────┬───────┘  └────┬─────┘  │
-└──────────┼────────────────┼───────────────┼─────────┘
-           │    REST API calls (fetch)       │
-           ▼                                ▼
-┌─────────────────────────────────────────────────────┐
-│                  FastAPI Backend                    │
-│                                                     │
-│   POST /tasks      ← create event                  │
-│   GET  /tasks      ← load calendar                 │
-│   PATCH /tasks/:id ← edit / mark complete/missed   │
-│   DELETE /tasks/:id← remove event                  │
-│   POST /chat       ← send message to AI            │
-│                                                     │
-│   ┌──────────────────────────────────────────────┐  │
-│   │  Scheduling Engine (schedule_engine.py)      │  │
-│   │  Sorts tasks by priority, fills time slots,  │  │
-│   │  protects sleep block                        │  │
-│   └──────────────────────────────────────────────┘  │
-│                                                     │
-│   ┌──────────────────────────────────────────────┐  │
-│   │  AI Assistant (ai_assistant.py)              │  │
-│   │  Sends schedule context to OpenAI GPT-4o-mini│  │
-│   │  Returns structured JSON action + message    │  │
-│   └──────────────────────────────────────────────┘  │
-│                                                     │
-│   SQLite Database (rem_ai.db)                       │
-│   └── tasks table — all events, priorities,        │
-│       miss counts, repeat configs                   │
-└─────────────────────────────────────────────────────┘
-           │
-           ▼
-    OpenAI API (GPT-4o-mini)
-```
 
 ### Data flow for a chat message
 
