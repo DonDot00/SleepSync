@@ -245,4 +245,4 @@ This hackathon project covers the core scheduling loop. Here is where SleepSync 
 | Donovan Raymond  | Back End Developer  |
 | Rasheed Mustapha | Front End Developer |
 
-- [SleepSync](#SleepSync)
+- [⬆️Back to Top](#SleepSync)
