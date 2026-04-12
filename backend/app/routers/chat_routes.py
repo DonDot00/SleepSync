@@ -1,3 +1,6 @@
+from asyncio import tasks
+from urllib import request
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db_setup import get_db
@@ -18,21 +21,23 @@ class ChatRequest(BaseModel):
 def chat(request: ChatRequest, db: Session = Depends(get_db)):
     tasks = db.query(Task).all()
     # Build a context object that tells the AI everything it needs to know{a dictionary}
-    # about the user's current schedule before generating a response
+    # build schedule context using updated field names that match the new model
     schedule_context = {
         "wake_time": request.wake_time,
         "sleep_time": request.sleep_time,
         "tasks": [
             {
                 "id": t.id,
-                "name": t.name,
+                "title": t.title,               
                 "type": t.task_type,
                 "priority": t.priority,
                 "fixed_time": t.fixed_time,
-                "duration_minutes": t.duration_minutes,
+                "start_h": t.start_h,           
+                "dur_h": t.dur_h,               
+                "day": t.day,                  
                 "miss_streak": t.miss_count,
             }
-            for t in tasks # loop through every task
+            for t in tasks
         ]
     }
     # Pass the user's message and full schedule context to the AI service
