@@ -4,6 +4,7 @@ from typing import List
 from app.db_setup import get_db
 from app.models.task_model import Task
 from app.schemas.task_schemas import TaskCreate, TaskUpdate, TaskOut
+from datetime import date, timedelta
 
 
 router = APIRouter()  # all routes in this file are registered under the /tasks prefix in main.py
@@ -31,7 +32,46 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 # Called on page load so the calendar can show all saved events. Returns every task row
 @router.get("/", response_model=List[TaskOut])
 def get_tasks(db: Session = Depends(get_db)):
-    return db.query(Task).all()
+    tasks = db.query(Task).all()
+    expanded = []
+    
+    for task in tasks:
+        expanded.append(task)  # always include the original
+        
+        # if task repeats, generate copies for each repeat day
+        # repeat.days contains day-of-week numbers [0=Sun, 1=Mon ...]
+        if task.repeat and task.repeat.get("enabled") and task.repeat.get("days"):
+            today = date.today()
+            # generate copies for the next 30 days
+            for offset in range(1, 30):
+                future_date = today + timedelta(days=offset)
+                day_of_week = future_date.weekday() + 1  # convert to Sun=0 format
+                # Sunday fix — Python weekday() gives Mon=0, we want Sun=0
+                day_of_week = day_of_week % 7
+                
+                if day_of_week in task.repeat["days"]:
+                    # create a virtual copy with the correct day offset
+                    virtual = TaskOut(
+                        id=task.id,
+                        title=task.title,
+                        color=task.color,
+                        start_h=task.start_h,
+                        dur_h=task.dur_h,
+                        day=offset,
+                        location=task.location,
+                        description=task.description,
+                        priority=task.priority,
+                        task_type=task.task_type,
+                        fixed_time=task.fixed_time,
+                        repeat=task.repeat,
+                        is_completed=task.is_completed,
+                        is_missed=task.is_missed,
+                        miss_count=task.miss_count,
+                        complete_count=task.complete_count,
+                    )
+                    expanded.append(virtual)
+    
+    return expanded
 
 
 # ── PATCH /tasks/{task_id} 

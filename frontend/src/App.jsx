@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { DndContext, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import "./App.css";
 
-const HOUR_PX = 64;
+// ── Constants ──
+const HOUR_PX     = 64;
 const TOTAL_HOURS = 24;
-const DAYS = ["S","M","T","W","T","F","S"];
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS        = ["S","M","T","W","T","F","S"];
+const MONTHS      = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 const SLEEP_TIPS = [
   "Keep your wake-up time consistent, even on weekends.",
@@ -41,23 +42,117 @@ const EVENT_COLORS = [
   { id:"green",  bg:"#0a2010", border:"#22c55e", text:"#4ade80" },
 ];
 
-const PRIORITY_LABELS = { high:"High", medium:"Medium", low:"Low" };
+const PRIORITY_LABELS  = { high:"High", medium:"Medium", low:"Low" };
 const TASK_TYPE_LABELS = { fixed:"Fixed", flexible:"Flexible", free:"Free time" };
-const DOW = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const DOW              = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const todayDate        = new Date();
 
-const todayDate = new Date();
+// ── API Layer ──
+const BASE = "http://localhost:8000";
 
-function makeDefaultRepeat() { return { enabled: false, days: [] }; }
+// converts backend snake_case to frontend camelCase
+function toFrontend(task) {
+  return {
+    id:             task.id,
+    title:          task.title,
+    color:          task.color,
+    startH:         task.start_h,
+    durH:           task.dur_h,
+    day:            task.day,
+    location:       task.location    || "",
+    description:    task.description || "",
+    priority:       task.priority,
+    taskType:       task.task_type,
+    fixed_time:     task.fixed_time,
+    repeat:         task.repeat      || { enabled: false, days: [] },
+    is_completed:   task.is_completed,
+    is_missed:      task.is_missed,
+    miss_count:     task.miss_count,
+    complete_count: task.complete_count,
+  };
+}
 
+// converts frontend camelCase to backend snake_case
+function toBackend(ev) {
+  return {
+    title:       ev.title,
+    color:       ev.color,
+    start_h:     ev.startH,
+    dur_h:       ev.durH,
+    day:         ev.day,
+    location:    ev.location    || null,
+    description: ev.description || null,
+    priority:    ev.priority,
+    task_type:   ev.taskType,
+    fixed_time:  ev.fixed_time  || null,
+    repeat:      ev.repeat      || { enabled: false, days: [] },
+  };
+}
+
+async function fetchTasks() {
+  const res  = await fetch(`${BASE}/tasks/`);
+  const data = await res.json();
+  return data.map(toFrontend);
+}
+
+async function createTask(ev) {
+  const res  = await fetch(`${BASE}/tasks/`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(toBackend(ev)),
+  });
+  const data = await res.json();
+  return toFrontend(data);
+}
+
+async function updateTask(id, changes) {
+  const res  = await fetch(`${BASE}/tasks/${id}`, {
+    method:  "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(changes),
+  });
+  const data = await res.json();
+  return toFrontend(data);
+}
+
+async function deleteTask(id) {
+  await fetch(`${BASE}/tasks/${id}`, { method: "DELETE" });
+}
+
+async function sendChatMessage(message, wakeTime = "07:00", sleepTime = "23:00", energyLevel = 3) {
+  const res = await fetch(`${BASE}/chat/`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      message,
+      wake_time:    wakeTime,
+      sleep_time:   sleepTime,
+      energy_level: energyLevel,
+    }),
+  });
+  return await res.json();
+}
+
+async function saveSleepData(data) {
+  try {
+    await fetch(`${BASE}/sleep/`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    });
+  } catch { /* non-blocking */ }
+}
+
+// ── Fallback events if backend is unreachable ──
 const INITIAL_EVENTS = [
-  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, day:0, location:"Riverside Park",  description:"5K easy pace.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
-  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    day:0, location:"Room 4B",         description:"Team intro, sprint planning.", priority:"high", taskType:"fixed", repeat:makeDefaultRepeat() },
-  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    day:0, location:"Cafeteria",       description:"Step away and recharge.", priority:"low", taskType:"free", repeat:{ enabled:true, days:[1,2,3,4,5] } },
-  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    day:0, location:"Room 4B",         description:"Core build time.", priority:"high", taskType:"fixed", repeat:makeDefaultRepeat() },
-  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  day:0, location:"The Rustic Table",description:"Casual dinner.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
-  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  day:1, location:"Zoom",            description:"Daily team sync.", priority:"high", taskType:"fixed", repeat:{ enabled:true, days:[1,2,3,4,5] } },
-  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    day:1, location:"Room 2A",         description:"Review final designs.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
-  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    day:1, location:"Fitness Center",  description:"Strength session.", priority:"medium", taskType:"flexible", repeat:{ enabled:true, days:[1,3,5] } },
+  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, day:0, location:"Riverside Park",  description:"5K easy pace.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
+  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    day:0, location:"Room 4B",          description:"Team intro, sprint planning.", priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[] } },
+  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    day:0, location:"Cafeteria",        description:"Step away and recharge.",      priority:"low",    taskType:"free",     repeat:{ enabled:true,  days:[1,2,3,4,5] } },
+  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    day:0, location:"Room 4B",          description:"Core build time.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[] } },
+  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  day:0, location:"The Rustic Table", description:"Casual dinner.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
+  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  day:1, location:"Zoom",             description:"Daily team sync.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:true,  days:[1,2,3,4,5] } },
+  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    day:1, location:"Room 2A",          description:"Review final designs.",        priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
+  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    day:1, location:"Fitness Center",   description:"Strength session.",            priority:"medium", taskType:"flexible", repeat:{ enabled:true,  days:[1,3,5] } },
 ];
 
 const INITIAL_MESSAGES = [
@@ -67,6 +162,7 @@ const INITIAL_MESSAGES = [
 ];
 
 // ── Helpers ──
+function makeDefaultRepeat() { return { enabled: false, days: [] }; }
 function fmtH(h) {
   const hrs=Math.floor(h)%24, mins=Math.round((h%1)*60);
   const p=hrs>=12?"pm":"am", d=hrs%12===0?12:hrs%12;
@@ -74,40 +170,54 @@ function fmtH(h) {
 }
 function snap(h)       { return Math.round(h*4)/4; }
 function hToInput(h)   { const hrs=Math.floor(h)%24,mins=Math.round((h%1)*60); return `${String(hrs).padStart(2,"0")}:${String(mins).padStart(2,"0")}`; }
-function inputToH(str) { const [h,m]=str.split(":").map(Number); return h+m/60; }
+function inputToH(str) { if(!str) return 9; const [h,m]=str.split(":").map(Number); return h+m/60; }
 function randomTip()   { return SLEEP_TIPS[Math.floor(Math.random()*SLEEP_TIPS.length)]; }
 function getColor(id)  { return EVENT_COLORS.find(c=>c.id===id)||EVENT_COLORS[0]; }
 function calcSleepHours(bed,wake) { const b=inputToH(bed),w=inputToH(wake); return w>b?w-b:(24-b)+w; }
 function estimateStages(h) { const m=h*60; return {light:Math.round(m*0.50),deep:Math.round(m*0.18),rem:Math.round(m*0.22)}; }
-function fmtMins(m)  { const h=Math.floor(m/60),mn=m%60; return mn===0?`${h}h`:`${h}h ${mn}m`; }
-function dayLabel(d) {
-  const n=new Date(); n.setDate(n.getDate()+d);
-  return n.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+function fmtMins(m)    { const h=Math.floor(m/60),mn=m%60; return mn===0?`${h}h`:`${h}h ${mn}m`; }
+function dateToIso(d)  { return d.toISOString().split("T")[0]; }
+
+// get day offset (0=today, 1=tomorrow ...) from a Date object
+function dateToDayOffset(date) {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const sel=new Date(date); sel.setHours(0,0,0,0);
+  return Math.round((sel-today)/(1000*60*60*24));
 }
-function deriveBadge(priority, taskType) {
-  if(priority==="high" && taskType==="fixed") return "High priority · Fixed";
-  if(priority==="high") return "High priority";
-  if(taskType==="fixed") return "Fixed task";
-  if(taskType==="free") return "Free time";
-  return null;
+
+// get a Date object that is `offset` days from today
+function offsetToDate(offset) {
+  const d=new Date(); d.setDate(d.getDate()+offset); return d;
 }
-function dateToIso(d) { return d.toISOString().split("T")[0]; }
-function isoToDay(iso) {
+
+// human-readable label for a day column header
+function dayLabel(offset) {
+  return offsetToDate(offset).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+
+function isoToOffset(iso) {
   const sel=new Date(iso+"T00:00:00");
   const t=new Date(); t.setHours(0,0,0,0);
   return Math.max(0,Math.round((sel-t)/(1000*60*60*24)));
 }
-function dayToIso(d) {
-  const n=new Date(); n.setDate(n.getDate()+d);
-  return dateToIso(n);
+
+function offsetToIso(offset) {
+  const n=new Date(); n.setDate(n.getDate()+offset); return dateToIso(n);
 }
 
-// ── Moon icon SVG ──
+function deriveBadge(priority, taskType) {
+  if(priority==="high" && taskType==="fixed") return "High priority · Fixed";
+  if(priority==="high")  return "High priority";
+  if(taskType==="fixed") return "Fixed task";
+  if(taskType==="free")  return "Free time";
+  return null;
+}
+
+// ── Moon Icon ──
 function MoonIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{flexShrink:0}}>
-      <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"
-        fill="#a78fff" opacity="0.9"/>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" fill="#a78fff" opacity="0.9"/>
     </svg>
   );
 }
@@ -136,7 +246,9 @@ function layoutEvents(events) {
 // ── Repeat Picker ──
 function RepeatPicker({ repeat, onChange }) {
   const toggle=(d)=>{
-    const days=repeat.days.includes(d)?repeat.days.filter(x=>x!==d):[...repeat.days,d].sort((a,b)=>a-b);
+    const days=repeat.days.includes(d)
+      ?repeat.days.filter(x=>x!==d)
+      :[...repeat.days,d].sort((a,b)=>a-b);
     onChange({...repeat,days});
   };
   return (
@@ -144,7 +256,8 @@ function RepeatPicker({ repeat, onChange }) {
       <div className="repeat-toggle-row">
         <label className="repeat-label">Repeat</label>
         <label className="toggle-switch">
-          <input type="checkbox" checked={repeat.enabled} onChange={e=>onChange({...repeat,enabled:e.target.checked})}/>
+          <input type="checkbox" checked={repeat.enabled}
+            onChange={e=>onChange({...repeat,enabled:e.target.checked})}/>
           <span className="toggle-track"><span className="toggle-thumb"/></span>
         </label>
       </div>
@@ -164,11 +277,16 @@ function RepeatPicker({ repeat, onChange }) {
 
 // ── Event Modal ──
 function EventModal({ ev, onClose, onSave, onDelete }) {
-  const [form,setForm]=useState({...ev,priority:ev.priority||"medium",taskType:ev.taskType||"flexible",repeat:ev.repeat||makeDefaultRepeat()});
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const endH=form.startH+form.durH;
-  const setEnd=(val)=>{ const e=inputToH(val); setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)})); };
-  const cd=getColor(form.color);
+  const [form,setForm]=useState({
+    ...ev,
+    priority: ev.priority||"medium",
+    taskType: ev.taskType||"flexible",
+    repeat:   ev.repeat  ||makeDefaultRepeat(),
+  });
+  const set   =(k,v)=>setForm(f=>({...f,[k]:v}));
+  const endH  =form.startH+form.durH;
+  const setEnd=(val)=>{const e=inputToH(val);setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)}));};
+  const cd    =getColor(form.color);
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
@@ -179,6 +297,10 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
         <div className="modal-body">
           <label className="modal-label">Title</label>
           <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)}/>
+          <label className="modal-label">Date</label>
+          <input className="modal-input" type="date"
+            value={offsetToIso(form.day)} min={dateToIso(new Date())}
+            onChange={e=>set("day",isoToOffset(e.target.value))} style={{colorScheme:"dark"}}/>
           <label className="modal-label">Location</label>
           <input className="modal-input" value={form.location||""} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
           <label className="modal-label">Description</label>
@@ -186,7 +308,8 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
           <div className="modal-row">
             <div className="modal-col">
               <label className="modal-label">Start time</label>
-              <input className="modal-input" type="time" value={hToInput(form.startH)} onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
+              <input className="modal-input" type="time" value={hToInput(form.startH)}
+                onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
             </div>
             <div className="modal-col">
               <label className="modal-label">End time</label>
@@ -240,10 +363,14 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
 }
 
 // ── Add Event Modal ──
-function AddEventModal({ onClose, onAdd }) {
-  const [form,setForm]=useState({title:"",color:"purple",startH:9,durH:1,day:0,location:"",description:"",priority:"medium",taskType:"flexible",repeat:makeDefaultRepeat()});
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const endH=form.startH+form.durH;
+function AddEventModal({ onClose, onAdd, defaultDayOffset=0 }) {
+  const [form,setForm]=useState({
+    title:"", color:"purple", startH:9, durH:1,
+    day:defaultDayOffset, location:"", description:"",
+    priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat(),
+  });
+  const set   =(k,v)=>setForm(f=>({...f,[k]:v}));
+  const endH  =form.startH+form.durH;
   const setEnd=(val)=>{const e=inputToH(val);setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)}));};
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -257,10 +384,8 @@ function AddEventModal({ onClose, onAdd }) {
           <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Event title..." autoFocus/>
           <label className="modal-label">Date</label>
           <input className="modal-input" type="date"
-            value={dayToIso(form.day)}
-            min={dateToIso(new Date())}
-            onChange={e=>set("day",isoToDay(e.target.value))}
-            style={{colorScheme:"dark"}}/>
+            value={offsetToIso(form.day)} min={dateToIso(new Date())}
+            onChange={e=>set("day",isoToOffset(e.target.value))} style={{colorScheme:"dark"}}/>
           <label className="modal-label">Location</label>
           <input className="modal-input" value={form.location} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
           <label className="modal-label">Description</label>
@@ -268,7 +393,8 @@ function AddEventModal({ onClose, onAdd }) {
           <div className="modal-row">
             <div className="modal-col">
               <label className="modal-label">Start time</label>
-              <input className="modal-input" type="time" value={hToInput(form.startH)} onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
+              <input className="modal-input" type="time" value={hToInput(form.startH)}
+                onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
             </div>
             <div className="modal-col">
               <label className="modal-label">End time</label>
@@ -314,7 +440,10 @@ function AddEventModal({ onClose, onAdd }) {
         </div>
         <div className="modal-footer">
           <button className="modal-btn-delete" onClick={onClose}>Cancel</button>
-          <button className="modal-btn-save" onClick={()=>{if(!form.title.trim())return;onAdd({...form,id:Date.now()});onClose();}}>Add event</button>
+          <button className="modal-btn-save"
+            onClick={()=>{if(!form.title.trim())return;onAdd(form);onClose();}}>
+            Add event
+          </button>
         </div>
       </div>
     </div>
@@ -324,28 +453,27 @@ function AddEventModal({ onClose, onAdd }) {
 // ── Draggable Event Block ──
 function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent, bedtimeH }) {
   const {attributes,listeners,setNodeRef,transform,isDragging}=useDraggable({id:ev.id});
-  const c=getColor(ev.color);
-  const GAP=3;
-  const widthPct  = totalCols>1?`calc(${100/totalCols}% - ${GAP}px)`:"calc(100% - 4px)";
-  const leftOffset= totalCols>1?`calc(${(colIndex/totalCols)*100}% + ${colIndex*(GAP/totalCols)}px)`:"2px";
-  const heightPx  = Math.max(ev.durH*HOUR_PX-3, 26);
-  const isCompact = heightPx < 48; // too short to show time or badge
-  const badge = deriveBadge(ev.priority, ev.taskType);
-  const evEnd = ev.startH+ev.durH;
-  const showWindown = bedtimeH>0 && ev.startH<bedtimeH && evEnd>bedtimeH;
-
+  const c          =getColor(ev.color);
+  const GAP        =3;
+  const widthPct   =totalCols>1?`calc(${100/totalCols}% - ${GAP}px)`:"calc(100% - 4px)";
+  const leftOffset =totalCols>1?`calc(${(colIndex/totalCols)*100}% + ${colIndex*(GAP/totalCols)}px)`:"2px";
+  const heightPx   =Math.max(ev.durH*HOUR_PX-3,26);
+  const isCompact  =heightPx<48;
+  const badge      =deriveBadge(ev.priority,ev.taskType);
+  const evEnd      =ev.startH+ev.durH;
+  const showWindown=bedtimeH>0&&ev.startH<bedtimeH&&evEnd>bedtimeH;
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className="cal-event"
       style={{
-        top:ev.startH*HOUR_PX, height:heightPx,
-        width:widthPct, left:leftOffset,
+        top:ev.startH*HOUR_PX,height:heightPx,
+        width:widthPct,left:leftOffset,
         transform:transform?`translate3d(${transform.x}px,${transform.y}px,0)`:undefined,
-        opacity:dimmed?0.3:1, zIndex:isDragging?50:colIndex+2,
+        opacity:dimmed?0.3:1,zIndex:isDragging?50:colIndex+2,
         cursor:isDragging?"grabbing":"pointer",
-        background:c.bg, borderLeft:`2px solid ${c.border}`, color:c.text,
-        borderTop:`1px solid rgba(255,255,255,0.06)`,
+        background:c.bg,borderLeft:`2px solid ${c.border}`,color:c.text,
+        borderTop:"1px solid rgba(255,255,255,0.06)",
       }}
-      onClick={()=>{if(!transform) onClickEvent(ev);}}>
+      onClick={()=>{if(!transform)onClickEvent(ev);}}>
       <div className="cal-event-title">{ev.title}</div>
       {!isCompact&&<div className="cal-event-time">{fmtH(ev.startH)} – {fmtH(evEnd)}</div>}
       {!isCompact&&badge&&!showWindown&&<div className="sleep-badge">{badge}</div>}
@@ -366,16 +494,17 @@ function DragGhost({ ev }) {
   );
 }
 
-// ── Mini Calendar ──
-function MonthCalendar({ selectedDay, onSelectDay, eventDays }) {
-  const now=new Date();
-  const [viewYear,setViewYear]=useState(now.getFullYear());
+// ── Mini Calendar — clicking a date drives the center panel ──
+function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
+  const now        =new Date();
+  const [viewYear, setViewYear] =useState(now.getFullYear());
   const [viewMonth,setViewMonth]=useState(now.getMonth());
-  const firstDow=new Date(viewYear,viewMonth,1).getDay();
+  const firstDow   =new Date(viewYear,viewMonth,1).getDay();
   const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
-  const isCurrent=viewYear===now.getFullYear()&&viewMonth===now.getMonth();
-  const prevMonth=()=>viewMonth===0?(setViewMonth(11),setViewYear(y=>y-1)):setViewMonth(m=>m-1);
-  const nextMonth=()=>viewMonth===11?(setViewMonth(0),setViewYear(y=>y+1)):setViewMonth(m=>m+1);
+  const isCurrent  =viewYear===now.getFullYear()&&viewMonth===now.getMonth();
+  const prevMonth  =()=>viewMonth===0?(setViewMonth(11),setViewYear(y=>y-1)):setViewMonth(m=>m-1);
+  const nextMonth  =()=>viewMonth===11?(setViewMonth(0),setViewYear(y=>y+1)):setViewMonth(m=>m+1);
+  const isSelected =(d)=>selectedDate.getFullYear()===viewYear&&selectedDate.getMonth()===viewMonth&&selectedDate.getDate()===d;
   return (
     <div>
       <div className="cal-nav">
@@ -390,13 +519,14 @@ function MonthCalendar({ selectedDay, onSelectDay, eventDays }) {
         <div className="day-label-underline"/>
         {Array.from({length:firstDow}).map((_,i)=><div key={`b${i}`} className="day-cell empty"/>)}
         {Array.from({length:daysInMonth},(_,i)=>i+1).map(d=>{
-          const isToday=isCurrent&&d===now.getDate();
-          const isSelected=isCurrent&&d===selectedDay;
-          const hasEvent=isCurrent&&eventDays.includes(d);
+          const isToday  =isCurrent&&d===now.getDate();
+          const isSel    =isSelected(d);
+          const hasEvent =isCurrent&&eventDays.includes(d);
           return (
-            <div key={d} onClick={()=>onSelectDay(d)}
-              className={`day-cell${isSelected?" today":""}${hasEvent?" has-event":""}`}
-              style={isToday&&!isSelected?{color:"#a78fff",fontWeight:600}:{}}>
+            <div key={d}
+              onClick={()=>onSelectDate(new Date(viewYear,viewMonth,d))}
+              className={`day-cell${isSel?" today":""}${hasEvent?" has-event":""}`}
+              style={isToday&&!isSel?{color:"#a78fff",fontWeight:600}:{}}>
               {d}
             </div>
           );
@@ -462,23 +592,38 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-// ── Sleep Health ──
-function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
+// ── Sleep Health — auto-saves to backend, notifies parent of bedtime changes ──
+function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChange }) {
   const [bedtime,   setBedtime]   = useState("23:00");
   const [waketime,  setWaketime]  = useState("06:40");
   const [goalHours, setGoalHours] = useState(8);
-  const totalHours=calcSleepHours(bedtime,waketime);
-  const stages=estimateStages(totalHours);
-  const totalMin=Math.round(totalHours*60);
-  const score=Math.min(100,Math.round((totalHours/goalHours)*100));
+  const totalHours = calcSleepHours(bedtime,waketime);
+  const stages     = estimateStages(totalHours);
+  const totalMin   = Math.round(totalHours*60);
+  const score      = Math.min(100,Math.round((totalHours/goalHours)*100));
   const r=34,circ=2*Math.PI*r,offset=circ-(score/100)*circ;
-  const avgDiff=Math.round((totalHours-6.47)*60);
-  // Sleep stage colors — updated to Deep=indigo, REM=violet, Light=slate blue
-  const stageDefs=[
+  const avgDiff    = Math.round((totalHours-6.47)*60);
+  const stageDefs  = [
     {label:"Deep",  mins:stages.deep,  color:"#4338ca"},
     {label:"REM",   mins:stages.rem,   color:"#7c3aed"},
     {label:"Light", mins:stages.light, color:"#3b82f6"},
   ];
+
+  // auto-save sleep data and bubble bedtime up to parent whenever values change
+  useEffect(()=>{
+    onBedtimeChange&&onBedtimeChange(bedtime);
+    saveSleepData({
+      bedtime,
+      wake_time:   waketime,
+      goal_hours:  goalHours,
+      total_hours: totalHours,
+      score,
+      deep_mins:   stages.deep,
+      rem_mins:    stages.rem,
+      light_mins:  stages.light,
+    });
+  },[bedtime,waketime,goalHours]);
+
   return (
     <div className="sleep-section">
       <div className="panel-title">Sleep health</div>
@@ -537,23 +682,43 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
   );
 }
 
-// ── AI Chat ──
-function AIChat() {
+// ── AI Chat — sends energy + bedtime context to backend ──
+function AIChat({ energy, bedtime, onEventCreated }) {
   const [messages,setMessages]=useState(INITIAL_MESSAGES);
-  const [input,setInput]=useState("");
+  const [input,   setInput]   =useState("");
+  const [loading, setLoading] =useState(false);
   const endRef=useRef();
-  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"})},[messages]);
-  const send=()=>{
-    const txt=input.trim();if(!txt)return;
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+
+  const send=async()=>{
+    const txt=input.trim();
+    if(!txt||loading) return;
     setMessages(p=>[...p,{from:"user",text:txt}]);
     setInput("");
-    setTimeout(()=>setMessages(p=>[...p,{from:"ai",text:"Got it! I'll factor that into your schedule and keep your sleep protected."}]),600);
+    setLoading(true);
+    try {
+      const res=await sendChatMessage(txt,"07:00",bedtime,energy);
+      setMessages(p=>[...p,{from:"ai",text:res.message}]);
+      if(res.warning){
+        setMessages(p=>[...p,{from:"ai",text:`⚠️ ${res.warning}`}]);
+      }
+      // if AI created a task in the backend, refresh events in the parent
+      if(res.action==="add_task"&&res.created_task_id){
+        onEventCreated&&onEventCreated();
+      }
+    } catch {
+      setMessages(p=>[...p,{from:"ai",text:"I'm having trouble connecting right now. Try again in a moment."}]);
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
     <div className="chat-section">
       <div className="panel-title">AI assistant</div>
       <div className="chat-messages">
         {messages.map((m,i)=><div key={i} className={`msg msg-${m.from}`}>{m.text}</div>)}
+        {loading&&<div className="msg msg-ai" style={{opacity:0.5}}>Thinking...</div>}
         <div ref={endRef}/>
       </div>
       <div className="chat-input-row">
@@ -597,24 +762,44 @@ function DayColumn({ dayOffset, events, activeId, onClickEvent, bedtimeH, nowRef
 
 // ── Root App ──
 export default function App() {
-  const [events,      setEvents]      = useState(INITIAL_EVENTS);
-  const [activeId,    setActiveId]    = useState(null);
-  const [modalEv,     setModalEv]     = useState(null);
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
-  const [energy,      setEnergy]      = useState(3);
-  const [showEnWarn,  setShowEnWarn]  = useState(true);
-  const [tip]                         = useState(()=>randomTip());
-  const [showTip,     setShowTip]     = useState(true);
-  const [bedtime,     setBedtime]     = useState("23:00");
-  const [numDays,     setNumDays]     = useState(2);
+  const [events,       setEvents]       = useState([]);
+  const [activeId,     setActiveId]     = useState(null);
+  const [modalEv,      setModalEv]      = useState(null);
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());  // drives both calendar and columns
+  const [energy,       setEnergy]       = useState(3);
+  const [showEnWarn,   setShowEnWarn]   = useState(true);
+  const [tip]                           = useState(()=>randomTip());
+  const [showTip,      setShowTip]      = useState(true);
+  const [bedtime,      setBedtime]      = useState("23:00");     // shared between header + sleep panel + AI
+  const [numDays,      setNumDays]      = useState(2);
 
-  const scrollRef=useRef(), nowRef=useRef(), centerRef=useRef();
-  const activeEv=events.find(e=>e.id===activeId);
-  const sensors=useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}));
-  const bedtimeH=inputToH(bedtime);
-  const eventDays=[todayDate.getDate()];
+  const scrollRef = useRef();
+  const nowRef    = useRef();
+  const centerRef = useRef();
+  const activeEv  = events.find(e=>e.id===activeId);
+  const sensors   = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}));
+  const bedtimeH  = inputToH(bedtime);
 
+  // day offset of the currently selected calendar date (0=today, 1=tomorrow, etc.)
+  const selectedOffset = dateToDayOffset(selectedDate);
+
+  // which calendar days have events — used for dot indicators on mini calendar
+  const eventDays = [...new Set(
+    events.map(ev=>offsetToDate(ev.day).getDate())
+  )];
+
+  // load tasks from backend on mount
+  useEffect(()=>{
+    fetchTasks().then(setEvents).catch(()=>setEvents(INITIAL_EVENTS));
+  },[]);
+
+  // called by AIChat when the AI creates a task — re-fetches the full list
+  const refreshEvents = useCallback(()=>{
+    fetchTasks().then(setEvents).catch(()=>{});
+  },[]);
+
+  // responsive column count based on center panel width
   useEffect(()=>{
     if(!centerRef.current) return;
     const ro=new ResizeObserver(entries=>{
@@ -624,6 +809,7 @@ export default function App() {
     return()=>ro.disconnect();
   },[]);
 
+  // scroll to current hour on load
   useEffect(()=>{
     if(scrollRef.current){
       const h=todayDate.getHours()+todayDate.getMinutes()/60;
@@ -631,6 +817,7 @@ export default function App() {
     }
   },[]);
 
+  // tick the "now" line every minute
   useEffect(()=>{
     const update=()=>{
       const d=new Date(),h=d.getHours()+d.getMinutes()/60;
@@ -641,53 +828,90 @@ export default function App() {
     return()=>clearInterval(t);
   },[]);
 
-  useEffect(()=>{ setShowEnWarn(true); },[energy]);
+  useEffect(()=>{setShowEnWarn(true);},[energy]);
 
   const onDragStart=({active})=>setActiveId(active.id);
-  const onDragEnd=({active,delta})=>{
+
+  const onDragEnd=async({active,delta})=>{
     setActiveId(null);
-    setEvents(prev=>prev.map(ev=>{
-      if(ev.id!==active.id) return ev;
-      let s=snap(ev.startH+delta.y/HOUR_PX);
-      s=Math.max(0,Math.min(TOTAL_HOURS-ev.durH,s));
-      return {...ev,startH:s};
-    }));
+    const ev=events.find(e=>e.id===active.id);
+    if(!ev) return;
+    let s=snap(ev.startH+delta.y/HOUR_PX);
+    s=Math.max(0,Math.min(TOTAL_HOURS-ev.durH,s));
+    setEvents(prev=>prev.map(e=>e.id===active.id?{...e,startH:s}:e));
+    try { await updateTask(ev.id,{start_h:s}); } catch {}
   };
 
-  const handleSave  =(u)=>{setEvents(p=>p.map(ev=>ev.id===u.id?u:ev));setModalEv(null);};
-  const handleDelete=(id)=>{setEvents(p=>p.filter(ev=>ev.id!==id));setModalEv(null);};
-  const handleAdd   =(nev)=>setEvents(p=>[...p,nev]);
+  const handleSave=async(u)=>{
+    try {
+      const saved=await updateTask(u.id,{
+        title:u.title, color:u.color, start_h:u.startH, dur_h:u.durH,
+        day:u.day, location:u.location, description:u.description,
+        priority:u.priority, task_type:u.taskType,
+        fixed_time:u.fixed_time||null, repeat:u.repeat,
+      });
+      setEvents(p=>p.map(ev=>ev.id===saved.id?saved:ev));
+    } catch {
+      setEvents(p=>p.map(ev=>ev.id===u.id?u:ev));
+    }
+    setModalEv(null);
+  };
 
+  const handleDelete=async(id)=>{
+    try { await deleteTask(id); } catch {}
+    setEvents(p=>p.filter(ev=>ev.id!==id));
+    setModalEv(null);
+  };
+
+  const handleAdd=async(nev)=>{
+    try {
+      const saved=await createTask(nev);
+      setEvents(p=>[...p,saved]);
+    } catch {
+      setEvents(p=>[...p,{...nev,id:Date.now()}]);
+    }
+  };
+
+  // first column = selected date, second column = the day after
   const dayCols=numDays===2
-    ?[{offset:0,evs:events.filter(e=>e.day===0)},{offset:1,evs:events.filter(e=>e.day===1)}]
-    :[{offset:0,evs:events.filter(e=>e.day===0)}];
+    ?[
+        {offset:selectedOffset,   evs:events.filter(e=>e.day===selectedOffset)},
+        {offset:selectedOffset+1, evs:events.filter(e=>e.day===selectedOffset+1)},
+      ]
+    :[{offset:selectedOffset, evs:events.filter(e=>e.day===selectedOffset)}];
 
-  const sleepScore=Math.min(100,Math.round((calcSleepHours("23:00","06:40")/8)*100));
+  const sleepScore=Math.min(100,Math.round((calcSleepHours(bedtime,"06:40")/8)*100));
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="app">
+
         <div className="topbar">
           <span className="logo">SleepSync</span>
           <span className="topbar-date">
             {todayDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}
           </span>
-          {/* Moon icon + sleep score */}
-          <div className="topbar-score">
-            <MoonIcon/>
-            Sleep score: {sleepScore}
-          </div>
+          <div className="topbar-score"><MoonIcon/>Sleep score: {sleepScore}</div>
         </div>
 
         <div className="main">
+
           <div className="panel left-panel">
-            <MonthCalendar selectedDay={selectedDay} onSelectDay={setSelectedDay} eventDays={eventDays}/>
+            <MonthCalendar
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              eventDays={eventDays}
+            />
           </div>
 
           <div className="center-panel" ref={centerRef}>
             <div className="today-header">
               <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
-                <span className="today-label">Today</span>
+                <span className="today-label">
+                  {selectedOffset===0
+                    ?"Today"
+                    :selectedDate.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}
+                </span>
                 <div className="header-bedtime">
                   <span className="header-bedtime-label">Bedtime</span>
                   <input className="header-bedtime-input" type="time" value={bedtime}
@@ -717,17 +941,19 @@ export default function App() {
                   ))}
                 </div>
                 <div className="day-cols-flex">
-                  {/* Sticky column headers — sit ABOVE the now line */}
                   <div className="day-headers-row">
-                    {dayCols.map(col=>(
+                    {dayCols.map((col,i)=>(
                       <div key={col.offset} className="day-col-header-cell">
-                        {col.offset===0?"Today":"Tomorrow"} — {dayLabel(col.offset)}
+                        {i===0
+                          ?(selectedOffset===0?"Today":"Selected")
+                          :"Next day"} — {dayLabel(col.offset)}
                       </div>
                     ))}
                   </div>
                   <div className="day-cols-body">
                     {dayCols.map((col,i)=>(
-                      <div key={col.offset} className={`day-col-flex-item${i>0?" day-col-divider":""}`}>
+                      <div key={col.offset}
+                        className={`day-col-flex-item${i>0?" day-col-divider":""}`}>
                         <DayColumn
                           dayOffset={col.offset}
                           events={col.evs}
@@ -745,10 +971,13 @@ export default function App() {
           </div>
 
           <div className="right-panel">
-            <SleepHealth showTip={showTip} tip={tip}
+            <SleepHealth
+              showTip={showTip} tip={tip}
               onDismissTip={()=>setShowTip(false)}
-              onDontShowTip={()=>setShowTip(false)}/>
-            <AIChat/>
+              onDontShowTip={()=>setShowTip(false)}
+              onBedtimeChange={setBedtime}
+            />
+            <AIChat energy={energy} bedtime={bedtime} onEventCreated={refreshEvents}/>
           </div>
         </div>
       </div>
@@ -756,8 +985,16 @@ export default function App() {
       <DragOverlay dropAnimation={null}>
         {activeEv?<DragGhost ev={activeEv}/>:null}
       </DragOverlay>
-      {modalEv&&<EventModal ev={modalEv} onClose={()=>setModalEv(null)} onSave={handleSave} onDelete={handleDelete}/>}
-      {showAdd&&<AddEventModal onClose={()=>setShowAdd(false)} onAdd={handleAdd}/>}
+
+      {modalEv&&(
+        <EventModal ev={modalEv} onClose={()=>setModalEv(null)}
+          onSave={handleSave} onDelete={handleDelete}/>
+      )}
+
+      {showAdd&&(
+        <AddEventModal onClose={()=>setShowAdd(false)}
+          onAdd={handleAdd} defaultDayOffset={selectedOffset}/>
+      )}
     </DndContext>
   );
 }
