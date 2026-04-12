@@ -5,14 +5,15 @@ import "./App.css";
 const HOUR_PX = 64;
 const TOTAL_HOURS = 24;
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const EVENTS_THIS_MONTH = [3, 7, 9, 11, 14, 17, 20, 23];
 
 const INITIAL_EVENTS = [
-  { id: 1, title: "Morning run",       type: "teal",   startH: 7,  durH: 0.75, badge: null },
-  { id: 2, title: "Hackathon kickoff", type: "purple", startH: 9,  durH: 3,    badge: "High focus window" },
-  { id: 3, title: "Lunch break",       type: "gray",   startH: 12, durH: 1,    badge: null },
-  { id: 4, title: "Build sprint",      type: "purple", startH: 13, durH: 5,    badge: "Wind down by 10pm" },
-  { id: 5, title: "Team dinner",       type: "pink",   startH: 19, durH: 1.5,  badge: null },
+  { id: 1, title: "Morning run",       type: "teal",   startH: 7,  durH: 0.75, badge: null,     location: "Riverside Park",    description: "5K easy pace along the river trail." },
+  { id: 2, title: "Hackathon kickoff", type: "purple", startH: 9,  durH: 3,    badge: "High focus window", location: "Room 4B", description: "Team intro, problem statement reveal, sprint planning." },
+  { id: 3, title: "Lunch break",       type: "gray",   startH: 12, durH: 1,    badge: null,     location: "Cafeteria",         description: "Step away from the screen and recharge." },
+  { id: 4, title: "Build sprint",      type: "purple", startH: 13, durH: 5,    badge: "Wind down by 10pm", location: "Room 4B", description: "Core build time. No meetings, deep focus." },
+  { id: 5, title: "Team dinner",       type: "pink",   startH: 19, durH: 1.5,  badge: null,     location: "The Rustic Table",  description: "Casual dinner with the team before the final push." },
 ];
 
 const INITIAL_MESSAGES = [
@@ -21,23 +22,177 @@ const INITIAL_MESSAGES = [
   { from: "ai",   text: "Done! I've shifted the run to 6:00–6:45am. That gives you more focus time before kickoff." },
 ];
 
+const TYPE_OPTIONS = ["purple","teal","pink","gray"];
+const TYPE_LABELS  = { purple: "Work", teal: "Exercise", pink: "Personal", gray: "Rest" };
+
 function fmtH(h) {
   const hrs  = Math.floor(h) % 24;
   const mins = Math.round((h % 1) * 60);
   const period = hrs >= 12 ? "pm" : "am";
   const disp   = hrs % 12 === 0 ? 12 : hrs % 12;
-  return mins === 0
-    ? `${disp}${period}`
-    : `${disp}:${String(mins).padStart(2, "0")}${period}`;
+  return mins === 0 ? `${disp}${period}` : `${disp}:${String(mins).padStart(2,"0")}${period}`;
 }
 
-function snap(h) {
-  return Math.round(h * 4) / 4;
+function snap(h) { return Math.round(h * 4) / 4; }
+
+function hToInput(h) {
+  const hrs  = Math.floor(h) % 24;
+  const mins = Math.round((h % 1) * 60);
+  return `${String(hrs).padStart(2,"0")}:${String(mins).padStart(2,"0")}`;
 }
 
-/* ── Draggable event ── */
-function CalEvent({ ev, dimmed }) {
+function inputToH(str) {
+  const [h, m] = str.split(":").map(Number);
+  return h + m / 60;
+}
+
+/* ── Event modal ── */
+function EventModal({ ev, onClose, onSave, onDelete }) {
+  const [form, setForm] = useState({ ...ev });
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className={`modal-color-bar ev-${form.type}`} />
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <label className="modal-label">Title</label>
+          <input className="modal-input" value={form.title}
+            onChange={e => set("title", e.target.value)} />
+
+          <label className="modal-label">Location</label>
+          <input className="modal-input" value={form.location || ""}
+            onChange={e => set("location", e.target.value)} placeholder="Add location..." />
+
+          <label className="modal-label">Description</label>
+          <textarea className="modal-textarea" value={form.description || ""}
+            onChange={e => set("description", e.target.value)} placeholder="Add description..." rows={3} />
+
+          <div className="modal-row">
+            <div className="modal-col">
+              <label className="modal-label">Start time</label>
+              <input className="modal-input" type="time" value={hToInput(form.startH)}
+                onChange={e => set("startH", inputToH(e.target.value))} />
+            </div>
+            <div className="modal-col">
+              <label className="modal-label">Duration (hrs)</label>
+              <input className="modal-input" type="number" step="0.25" min="0.25" max="24"
+                value={form.durH} onChange={e => set("durH", parseFloat(e.target.value))} />
+            </div>
+          </div>
+
+          <label className="modal-label">Type</label>
+          <div className="modal-type-row">
+            {TYPE_OPTIONS.map(t => (
+              <button key={t} onClick={() => set("type", t)}
+                className={`modal-type-btn ev-${t} ${form.type === t ? "selected" : ""}`}>
+                {TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="modal-btn-delete" onClick={() => onDelete(ev.id)}>Delete</button>
+          <button className="modal-btn-save" onClick={() => onSave(form)}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Add Event modal ── */
+function AddEventModal({ onClose, onAdd }) {
+  const [form, setForm] = useState({
+    title: "", type: "purple", startH: 9, durH: 1,
+    location: "", description: "", badge: null,
+  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleAdd = () => {
+    if (!form.title.trim()) return;
+    onAdd({ ...form, id: Date.now() });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className={`modal-color-bar ev-${form.type}`} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#e8e4f0", flex: 1, paddingLeft: 12 }}>New event</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <label className="modal-label">Title</label>
+          <input className="modal-input" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Event title..." autoFocus />
+
+          <label className="modal-label">Location</label>
+          <input className="modal-input" value={form.location} onChange={e => set("location", e.target.value)} placeholder="Add location..." />
+
+          <label className="modal-label">Description</label>
+          <textarea className="modal-textarea" value={form.description} onChange={e => set("description", e.target.value)} placeholder="Add description..." rows={3} />
+
+          <div className="modal-row">
+            <div className="modal-col">
+              <label className="modal-label">Start time</label>
+              <input className="modal-input" type="time" value={hToInput(form.startH)} onChange={e => set("startH", inputToH(e.target.value))} />
+            </div>
+            <div className="modal-col">
+              <label className="modal-label">Duration (hrs)</label>
+              <input className="modal-input" type="number" step="0.25" min="0.25" max="24" value={form.durH} onChange={e => set("durH", parseFloat(e.target.value))} />
+            </div>
+          </div>
+
+          <label className="modal-label">Type</label>
+          <div className="modal-type-row">
+            {TYPE_OPTIONS.map(t => (
+              <button key={t} onClick={() => set("type", t)}
+                className={`modal-type-btn ev-${t} ${form.type === t ? "selected" : ""}`}>
+                {TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-btn-delete" onClick={onClose}>Cancel</button>
+          <button className="modal-btn-save" onClick={handleAdd}>Add event</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Draggable event block ── */
+function CalEvent({ ev, dimmed, onClickEvent }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: ev.id });
+
+  const dragStartPos = useRef(null);
+  const hasDragged   = useRef(false);
+
+  const handlePointerDown = (e) => {
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    hasDragged.current   = false;
+  };
+
+  const handlePointerMove = (e) => {
+    if (!dragStartPos.current) return;
+    const dx = Math.abs(e.clientX - dragStartPos.current.x);
+    const dy = Math.abs(e.clientY - dragStartPos.current.y);
+    if (dx > 4 || dy > 4) hasDragged.current = true;
+  };
+
+  const handlePointerUp = () => {
+    if (!hasDragged.current) onClickEvent(ev);
+    dragStartPos.current = null;
+    hasDragged.current   = false;
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -50,8 +205,11 @@ function CalEvent({ ev, dimmed }) {
         transform: transform ? `translate3d(${transform.x}px,${transform.y}px,0)` : undefined,
         opacity:   dimmed ? 0.3 : 1,
         zIndex:    isDragging ? 50 : 2,
-        cursor:    "grab",
+        cursor:    "pointer",
       }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     >
       <div className="cal-event-title">{ev.title}</div>
       <div className="cal-event-time">{fmtH(ev.startH)} – {fmtH(ev.startH + ev.durH)}</div>
@@ -63,29 +221,51 @@ function CalEvent({ ev, dimmed }) {
 function DragGhost({ ev }) {
   return (
     <div className={`cal-event ev-${ev.type}`}
-      style={{ height: Math.max(ev.durH * HOUR_PX - 3, 26), opacity: 0.92, width: 230, pointerEvents: "none" }}>
+      style={{ height: Math.max(ev.durH * HOUR_PX - 3, 26), opacity: 0.9, width: 230, pointerEvents: "none" }}>
       <div className="cal-event-title">{ev.title}</div>
       <div className="cal-event-time">{fmtH(ev.startH)} – {fmtH(ev.startH + ev.durH)}</div>
     </div>
   );
 }
 
-/* ── Mini calendar ── */
-function MonthCalendar() {
-  const [selected, setSelected] = useState(12);
-  const days = Array.from({ length: 30 }, (_, i) => i + 1);
+/* ── Mini calendar with month/year nav ── */
+function MonthCalendar({ selectedDay, onSelectDay }) {
+  const now = new Date();
+  const [viewYear,  setViewYear]  = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  const firstDow    = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+  const prevYear  = () => setViewYear(y => y - 1);
+  const nextYear  = () => setViewYear(y => y + 1);
+
   return (
     <div>
-      <div className="panel-title">April 2026</div>
+      <div className="cal-nav">
+        <button className="cal-nav-btn" onClick={prevYear}  title="Previous year">«</button>
+        <button className="cal-nav-btn" onClick={prevMonth} title="Previous month">‹</button>
+        <span className="cal-nav-label">{MONTHS[viewMonth]} {viewYear}</span>
+        <button className="cal-nav-btn" onClick={nextMonth} title="Next month">›</button>
+        <button className="cal-nav-btn" onClick={nextYear}  title="Next year">»</button>
+      </div>
       <div className="month-grid">
         {DAYS.map((d, i) => <div key={i} className="day-label">{d}</div>)}
-        {Array.from({ length: 2 }).map((_, i) => <div key={`b${i}`} className="day-cell empty" />)}
-        {days.map(d => (
-          <div key={d} onClick={() => setSelected(d)}
-            className={`day-cell ${d === selected ? "today" : ""} ${EVENTS_THIS_MONTH.includes(d) ? "has-event" : ""}`}>
-            {d}
-          </div>
-        ))}
+        {Array.from({ length: firstDow }).map((_, i) => <div key={`b${i}`} className="day-cell empty" />)}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
+          const isToday   = isCurrentMonth && d === now.getDate();
+          const isSelected = isCurrentMonth && d === selectedDay;
+          return (
+            <div key={d} onClick={() => onSelectDay(d)}
+              className={`day-cell ${isSelected ? "today" : ""} ${EVENTS_THIS_MONTH.includes(d) ? "has-event" : ""}`}
+              style={isToday && !isSelected ? { color: "#a78fff", fontWeight: 600 } : {}}>
+              {d}
+            </div>
+          );
+        })}
       </div>
       <div className="mini-legend">
         <div className="legend-item"><span className="legend-dot purple" />Work / deadline</div>
@@ -116,46 +296,11 @@ function MonthCalendar() {
   );
 }
 
-/* ── AI Chat ── */
-function AIChat() {
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
-  const [input, setInput] = useState("");
-  const endRef = useRef();
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-  const send = () => {
-    const txt = input.trim();
-    if (!txt) return;
-    setMessages(p => [...p, { from: "user", text: txt }]);
-    setInput("");
-    setTimeout(() => {
-      setMessages(p => [...p, { from: "ai", text: "Got it! I'll factor that into your schedule and keep your sleep protected." }]);
-    }, 600);
-  };
-
-  return (
-    <div className="chat-section">
-      <div className="panel-title">AI assistant</div>
-      <div className="chat-messages">
-        {messages.map((m, i) => <div key={i} className={`msg msg-${m.from}`}>{m.text}</div>)}
-        <div ref={endRef} />
-      </div>
-      <div className="chat-input-row">
-        <input className="chat-input" placeholder="Ask SleepSync..."
-          value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && send()} />
-        <button className="send-btn" onClick={send}>↑</button>
-      </div>
-    </div>
-  );
-}
-
-/* ── Sleep Health ── */
+/* ── Sleep Health (top right — larger) ── */
 function SleepHealth() {
   const score = 74;
-  const r = 34;
-  const circ = 2 * Math.PI * r;
+  const r     = 34;
+  const circ  = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
   return (
     <div className="sleep-section">
@@ -212,16 +357,54 @@ function SleepHealth() {
   );
 }
 
+/* ── AI Chat (bottom right — compact) ── */
+function AIChat() {
+  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [input, setInput]       = useState("");
+  const endRef = useRef();
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  const send = () => {
+    const txt = input.trim();
+    if (!txt) return;
+    setMessages(p => [...p, { from: "user", text: txt }]);
+    setInput("");
+    setTimeout(() => {
+      setMessages(p => [...p, { from: "ai", text: "Got it! I'll factor that into your schedule and keep your sleep protected." }]);
+    }, 600);
+  };
+
+  return (
+    <div className="chat-section">
+      <div className="panel-title">AI assistant</div>
+      <div className="chat-messages">
+        {messages.map((m, i) => <div key={i} className={`msg msg-${m.from}`}>{m.text}</div>)}
+        <div ref={endRef} />
+      </div>
+      <div className="chat-input-row">
+        <input className="chat-input" placeholder="Ask SleepSync..."
+          value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && send()} />
+        <button className="send-btn" onClick={send}>↑</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Root App ── */
 export default function App() {
-  const [events, setEvents]     = useState(INITIAL_EVENTS);
-  const [activeId, setActiveId] = useState(null);
-  const scrollRef = useRef();  // only the scroll area moves
+  const [events,     setEvents]     = useState(INITIAL_EVENTS);
+  const [activeId,   setActiveId]   = useState(null);
+  const [modalEv,    setModalEv]    = useState(null);
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+
+  const scrollRef = useRef();
   const nowRef    = useRef();
 
   const activeEv = events.find(e => e.id === activeId);
 
-  /* scroll to current time on mount */
   useEffect(() => {
     if (scrollRef.current) {
       const now = new Date();
@@ -230,7 +413,6 @@ export default function App() {
     }
   }, []);
 
-  /* live now-line */
   useEffect(() => {
     const update = () => {
       const d = new Date();
@@ -254,6 +436,22 @@ export default function App() {
     }));
   };
 
+  const handleSaveModal = (updated) => {
+    setEvents(prev => prev.map(ev => ev.id === updated.id ? updated : ev));
+    setModalEv(null);
+  };
+
+  const handleDeleteModal = (id) => {
+    setEvents(prev => prev.filter(ev => ev.id !== id));
+    setModalEv(null);
+  };
+
+  const handleAddEvent = (newEv) => {
+    setEvents(prev => [...prev, newEv]);
+  };
+
+  const today = new Date();
+
   return (
     <DndContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="app">
@@ -261,7 +459,9 @@ export default function App() {
         {/* Topbar */}
         <div className="topbar">
           <span className="logo">SleepSync</span>
-          <span className="topbar-date">Saturday, April 12 2026</span>
+          <span className="topbar-date">
+            {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </span>
           <div className="topbar-score"><span className="score-dot" />Sleep score: 74</div>
         </div>
 
@@ -269,63 +469,74 @@ export default function App() {
 
           {/* LEFT */}
           <div className="panel left-panel">
-            <MonthCalendar />
+            <MonthCalendar selectedDay={selectedDay} onSelectDay={setSelectedDay} />
           </div>
 
           {/* CENTER */}
           <div className="center-panel">
-
-            {/* sticky header — does NOT scroll */}
             <div className="today-header">
-              <span className="today-label">Today</span>
-              <span className="today-sub">{events.length} events · Bedtime by 11:00pm</span>
+              <div>
+                <span className="today-label">Today</span>
+                <span className="today-sub">{events.length} events · Bedtime by 11:00pm</span>
+              </div>
+              <button className="add-event-btn" onClick={() => setShowAdd(true)}>+ Add event</button>
             </div>
 
-            {/* scrollable grid — only this part scrolls */}
             <div className="cal-scroll-area" ref={scrollRef}>
               <div className="hour-grid" style={{ height: TOTAL_HOURS * HOUR_PX }}>
-
-                {/* Hour lines */}
                 {Array.from({ length: TOTAL_HOURS }, (_, h) => (
                   <div key={h} className="hour-row" style={{ top: h * HOUR_PX }}>
                     <div className="hour-label">{fmtH(h)}</div>
                     <div className="hour-line" />
                   </div>
                 ))}
-
-                {/* Half-hour dashes */}
                 {Array.from({ length: TOTAL_HOURS }, (_, h) => (
                   <div key={`hh${h}`} className="half-hour-line" style={{ top: (h + 0.5) * HOUR_PX }} />
                 ))}
-
-                {/* Event blocks */}
                 <div className="events-layer">
                   {events.map(ev => (
-                    <CalEvent key={ev.id} ev={ev} dimmed={ev.id === activeId} />
+                    <CalEvent key={ev.id} ev={ev} dimmed={ev.id === activeId}
+                      onClickEvent={setModalEv} />
                   ))}
                 </div>
-
-                {/* Now line */}
                 <div ref={nowRef} className="now-line">
                   <div className="now-dot" />
                 </div>
-
               </div>
             </div>
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT — sleep on top, chat on bottom */}
           <div className="right-panel">
-            <AIChat />
             <SleepHealth />
+            <AIChat />
           </div>
 
         </div>
       </div>
 
+      {/* Drag ghost */}
       <DragOverlay dropAnimation={null}>
         {activeEv ? <DragGhost ev={activeEv} /> : null}
       </DragOverlay>
+
+      {/* Event detail modal */}
+      {modalEv && (
+        <EventModal
+          ev={modalEv}
+          onClose={() => setModalEv(null)}
+          onSave={handleSaveModal}
+          onDelete={handleDeleteModal}
+        />
+      )}
+
+      {/* Add event modal */}
+      {showAdd && (
+        <AddEventModal
+          onClose={() => setShowAdd(false)}
+          onAdd={handleAddEvent}
+        />
+      )}
     </DndContext>
   );
 }
