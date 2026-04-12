@@ -30,6 +30,8 @@ def chat_with_ai(user_message: str, schedule_context: dict) -> dict:
         model="gpt-4o-mini",
         messages=[
             { "role": "system", "content": SYSTEM_PROMPT },
+            # the user message includes the full schedule context AND what the user said
+            # bundling them together means the AI always has the full picture
             { "role": "user", "content": f"Current schedule: {schedule_context}\n\nUser said: {user_message}" }
         ],
         response_format={ "type": "json_object" }
