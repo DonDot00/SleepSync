@@ -1,44 +1,5 @@
 # SleepSync
 
-> An AI-assistant scheduling tool that optimizes your calendar around your sleep so you perform at your best, every day.
-
-### About
-
-SleepSync is an AI assistant that analyzes your schedule and helps you build positive habits around optimal sleep, tailored to you. Instead of letting the demands of daily life eat into your rest, SleepSync meticulously plans your day with your sleep health as its main priority.
-
-Whether you're striving to meet a deadline or managing a packed week, SleepSync makes sure you're not sacrificing the sleep you need to get things done efficiently.
-
-## Features
-
-- ⚡ **Real-time Adjustments** - Adapts your schedule on the fly when sudden changes come up.
-- 🤖 **AI assistant** — Chat to plan your day, reschedule events, and get personalized sleep advice.
-- 😴 **Sleep optimization** — Suggests ideal bedtimes and wake times based on your workload and personal inputs.
-- 🗓 **Smart scheduling** — AI assists in setting the best times for tasks based on your sleep patterns.
-
-
-## Tech Stack 
-| Layer      | Technology       |
-|------------|------------------|
-| Frontend   | Node.js + React  |
-| Backend    | Python + FastAPI |
-| AI         | Open API         |
-| Styling    | Tailwind CSS     |
-
-
-
-
-## How It Works
-1. 
-# Team
-**Built with C4's, Celsius, Aulani's and not enough sleep at HackHound's Loyola Maryland - 4/11/2026 to 4/12/2026**
-
-| Name             | Role |
-|------------------|------|
-| Donovan Raymond  |   Back End Developer   |
-| Rasheed Mustapha |   Front End Developer   |
-
-# SleepSync
-
 > An AI-powered scheduling assistant that optimizes your calendar around your sleep — so you perform at your best, every day.
 
 ---
@@ -163,7 +124,7 @@ Frontend displays AI message + optionally refreshes calendar
 
 | Layer      | Technology              | Why                                       |
 |------------|-------------------------|-------------------------------------------|
-| Frontend   | React + Vite            | Fast dev server, component-based UI       |
+| Frontend   | React, Vite, Node.js    | Fast dev server, component-based UI       |
 | Styling    | Plain CSS + Rubik/Syne  | Custom dark theme, no framework overhead  |
 | Backend    | Python + FastAPI        | Fast, typed, auto-generates API docs      |
 | Database   | SQLite + SQLAlchemy     | Zero config for hackathon, easy to swap   |
@@ -254,27 +215,24 @@ Frontend runs at `http://localhost:5173`
 
 ## Roadmap
 
-The hackathon build covers the core scheduling loop. Here is where SleepSync goes next:
+This hackathon project covers the core scheduling loop. Here is where SleepSync may go next:
 
 ### Near term
-- [ ] User accounts and authentication
-- [ ] Persistent sleep history across sessions
-- [ ] Weekly sleep report — % completed, most missed tasks, goal hit rate
+- [ ] User accounts and authentication.
+- [ ] Persistent sleep history applied across sessions.
+- [ ] Weekly comprehensive sleep report which data such as most missed tasks, goal hit rate, sleep stats. 
 - [ ] Streak tracking (Duolingo-style) for consistent habits
-- [ ] Mobile-responsive layout
 
 ### Medium term
-- [ ] Google Calendar and Outlook sync — pull existing events automatically
-- [ ] Wearable integration — Fitbit, Oura Ring, Apple Health sleep data
-- [ ] Circadian rhythm modeling — schedule tasks around your natural alertness curve
-- [ ] Burnout detection — flags when sleep debt accumulates over multiple days
-- [ ] Mood journal — one-word daily check-in, correlated with sleep score over time
+- [ ] Google Calendar and Outlook sync to pull existing events automatically and fit them into SleepSync.
+- [ ] Wearable integration using devices such as Fitbit, Oura Ring, Apple Health sleep data.
+- [ ] Burnout detection which flags when sleep debt accumulates over multiple days.
+- [ ] Mood journal — one-word daily check-in, correlated with sleep score and possibly energey level over time.
 
 ### Long term
-- [ ] Team scheduling — find shared availability without anyone sacrificing sleep
-- [ ] Multi-timezone support for distributed teams
-- [ ] Native iOS and Android apps
-- [ ] LLM fine-tuning on anonymized scheduling patterns for better personalization
+- [ ] Team scheduling to find shared availability with others without anyone sacrificing sleep.
+- [ ] Multi-timezone support for distributed teams.
+- [ ] Native iOS and Android apps.
 - [ ] Integration with academic calendars (Canvas, Blackboard) for student scheduling
 
 ---
