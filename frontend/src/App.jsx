@@ -6,6 +6,7 @@ const HOUR_PX = 64;
 const TOTAL_HOURS = 24;
 const DAYS = ["S","M","T","W","T","F","S"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
 const SLEEP_TIPS = [
   "Keep your wake-up time consistent, even on weekends.",
@@ -28,16 +29,6 @@ const SLEEP_TIPS = [
   "If you can't sleep after 20 minutes, get up and do something calm.",
   "Journaling 3 things you're grateful for before bed reduces anxiety.",
   "Your chronotype is largely genetic — work with it, not against it.",
-  "Napping longer than 30 minutes can cause sleep inertia — set an alarm.",
-  "Deep breathing (4-7-8 method) activates the parasympathetic nervous system before sleep.",
-  "Establish a pre-sleep ritual — your brain will learn to associate it with sleep.",
-  "Sleeping on your side is better for brain waste clearance.",
-  "Even 15 minutes of morning sunlight improves sleep onset time at night.",
-  "A warm bath 1–2 hours before bed lowers core body temperature.",
-  "Pink noise has shown stronger sleep benefits than white noise.",
-  "Your body repairs muscle during deep sleep — prioritize it after hard workouts.",
-  "Limit water intake 2 hours before bed to reduce nighttime waking.",
-  "Sleep quality matters more than quantity.",
 ];
 
 const EVENT_COLORS = [
@@ -51,23 +42,31 @@ const EVENT_COLORS = [
   { id:"green",  bg:"#0a2010", border:"#22c55e", text:"#4ade80" },
 ];
 
-// Demo events for today and tomorrow
+const PRIORITY_LABELS = { high:"🔴 High", medium:"🟡 Medium", low:"🟢 Low" };
+const TASK_TYPE_LABELS = { fixed:"Fixed", flexible:"Flexible", free:"Free time" };
+
+// Days of week for repetition picker
+const DOW = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
 const today = new Date();
-const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+
+function makeDefaultRepeat() {
+  return { enabled: false, days: [] };
+}
 
 const INITIAL_EVENTS = [
-  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, badge:null,               day:0, location:"Riverside Park",  description:"5K easy pace." },
-  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    badge:"High focus window", day:0, location:"Room 4B",         description:"Team intro, sprint planning." },
-  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    badge:null,               day:0, location:"Cafeteria",       description:"Step away and recharge." },
-  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    badge:"Wind down by 10pm", day:0, location:"Room 4B",        description:"Core build time." },
-  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  badge:null,               day:0, location:"The Rustic Table",description:"Casual dinner with the team." },
-  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  badge:null,               day:1, location:"Zoom",            description:"Daily team sync." },
-  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    badge:null,               day:1, location:"Room 2A",         description:"Review final designs." },
-  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    badge:null,               day:1, location:"Fitness Center",  description:"Strength session." },
+  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, day:0, location:"Riverside Park",  description:"5K easy pace.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
+  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    day:0, location:"Room 4B",         description:"Team intro, sprint planning.", priority:"high", taskType:"fixed", repeat:makeDefaultRepeat() },
+  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    day:0, location:"Cafeteria",       description:"Step away and recharge.", priority:"low", taskType:"free", repeat:{ enabled:true, days:[1,2,3,4,5] } },
+  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    day:0, location:"Room 4B",         description:"Core build time.", priority:"high", taskType:"fixed", repeat:makeDefaultRepeat() },
+  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  day:0, location:"The Rustic Table",description:"Casual dinner.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
+  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  day:1, location:"Zoom",            description:"Daily team sync.", priority:"high", taskType:"fixed", repeat:{ enabled:true, days:[1,2,3,4,5] } },
+  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    day:1, location:"Room 2A",         description:"Review final designs.", priority:"medium", taskType:"flexible", repeat:makeDefaultRepeat() },
+  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    day:1, location:"Fitness Center",  description:"Strength session.", priority:"medium", taskType:"flexible", repeat:{ enabled:true, days:[1,3,5] } },
 ];
 
 const INITIAL_MESSAGES = [
-  { from:"ai",   text:"Hey! You have a big day ahead. I've protected your wind-down window — aim to wrap up by 10pm tonight." },
+  { from:"ai",   text:"Hey! You have a big day ahead. I've protected your wind-down window — aim to wrap up by your bedtime tonight." },
   { from:"user", text:"Can you move my run to 6am?" },
   { from:"ai",   text:"Done! Shifted to 6:00–6:45am. That gives you more focus time before kickoff." },
 ];
@@ -86,9 +85,18 @@ function getColor(id)  { return EVENT_COLORS.find(c=>c.id===id)||EVENT_COLORS[0]
 function calcSleepHours(bed,wake) { const b=inputToH(bed),w=inputToH(wake); return w>b?w-b:(24-b)+w; }
 function estimateStages(h) { const m=h*60; return {light:Math.round(m*0.50),deep:Math.round(m*0.18),rem:Math.round(m*0.22)}; }
 function fmtMins(m)  { const h=Math.floor(m/60),mn=m%60; return mn===0?`${h}h`:`${h}h ${mn}m`; }
-function dayLabel(d)  {
+function dayLabel(d) {
   const n=new Date(); n.setDate(n.getDate()+d);
   return n.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+}
+
+// badge text derived from priority + taskType
+function deriveBadge(priority, taskType) {
+  if(priority==="high" && taskType==="fixed") return "High priority · Fixed";
+  if(priority==="high") return "High priority";
+  if(taskType==="fixed") return "Fixed task";
+  if(taskType==="free") return "Free time";
+  return null;
 }
 
 // ── Overlap layout ──
@@ -112,9 +120,38 @@ function layoutEvents(events) {
   });
 }
 
+// ── Repetition Picker ──
+function RepeatPicker({ repeat, onChange }) {
+  const toggle=(d)=>{
+    const days=repeat.days.includes(d)?repeat.days.filter(x=>x!==d):[...repeat.days,d].sort((a,b)=>a-b);
+    onChange({...repeat,days});
+  };
+  return (
+    <div className="repeat-section">
+      <div className="repeat-toggle-row">
+        <label className="repeat-label">Repeat</label>
+        <label className="toggle-switch">
+          <input type="checkbox" checked={repeat.enabled} onChange={e=>onChange({...repeat,enabled:e.target.checked})}/>
+          <span className="toggle-track"><span className="toggle-thumb"/></span>
+        </label>
+      </div>
+      {repeat.enabled&&(
+        <div className="repeat-days">
+          {DOW.map((d,i)=>(
+            <button key={i} onClick={()=>toggle(i)}
+              className={`dow-btn${repeat.days.includes(i)?" active":""}`}>
+              {d}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Event Modal ──
 function EventModal({ ev, onClose, onSave, onDelete }) {
-  const [form,setForm]=useState({...ev});
+  const [form,setForm]=useState({...ev, priority:ev.priority||"medium", taskType:ev.taskType||"flexible", repeat:ev.repeat||makeDefaultRepeat()});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const endH=form.startH+form.durH;
   const setEnd=(val)=>{ const e=inputToH(val); setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)})); };
@@ -129,10 +166,13 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
         <div className="modal-body">
           <label className="modal-label">Title</label>
           <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)}/>
+
           <label className="modal-label">Location</label>
           <input className="modal-input" value={form.location||""} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
+
           <label className="modal-label">Description</label>
-          <textarea className="modal-textarea" value={form.description||""} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={3}/>
+          <textarea className="modal-textarea" value={form.description||""} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={2}/>
+
           <div className="modal-row">
             <div className="modal-col">
               <label className="modal-label">Start time</label>
@@ -144,6 +184,38 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
             </div>
           </div>
           <div className="modal-duration-hint">Duration: {Math.floor(form.durH)}h {Math.round((form.durH%1)*60)>0?`${Math.round((form.durH%1)*60)}m`:""}</div>
+
+          {/* Priority + Task type */}
+          <div className="modal-row">
+            <div className="modal-col">
+              <label className="modal-label">Priority</label>
+              <div className="pill-group">
+                {["high","medium","low"].map(p=>(
+                  <button key={p} onClick={()=>set("priority",p)}
+                    className={`pill-btn${form.priority===p?" pill-active":""}`}
+                    data-priority={p}>
+                    {p.charAt(0).toUpperCase()+p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-col">
+              <label className="modal-label">Task type</label>
+              <div className="pill-group">
+                {["fixed","flexible","free"].map(t=>(
+                  <button key={t} onClick={()=>set("taskType",t)}
+                    className={`pill-btn${form.taskType===t?" pill-active":""}`}>
+                    {TASK_TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Repeat */}
+          <RepeatPicker repeat={form.repeat} onChange={v=>set("repeat",v)}/>
+
+          {/* Color */}
           <label className="modal-label">Color</label>
           <div className="color-picker-row">
             {EVENT_COLORS.map(c=>(
@@ -166,7 +238,7 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
 
 // ── Add Event Modal ──
 function AddEventModal({ onClose, onAdd }) {
-  const [form,setForm]=useState({title:"",color:"purple",startH:9,durH:1,day:0,location:"",description:"",badge:null});
+  const [form,setForm]=useState({title:"",color:"purple",startH:9,durH:1,day:0,location:"",description:"",priority:"medium",taskType:"flexible",repeat:makeDefaultRepeat()});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const endH=form.startH+form.durH;
   const setEnd=(val)=>{const e=inputToH(val);setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)}));};
@@ -180,15 +252,19 @@ function AddEventModal({ onClose, onAdd }) {
         <div className="modal-body">
           <label className="modal-label">Title</label>
           <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Event title..." autoFocus/>
+
           <label className="modal-label">Day</label>
           <select className="modal-input" value={form.day} onChange={e=>set("day",parseInt(e.target.value))}>
             <option value={0}>Today — {dayLabel(0)}</option>
             <option value={1}>Tomorrow — {dayLabel(1)}</option>
           </select>
+
           <label className="modal-label">Location</label>
           <input className="modal-input" value={form.location} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
+
           <label className="modal-label">Description</label>
-          <textarea className="modal-textarea" value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={3}/>
+          <textarea className="modal-textarea" value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={2}/>
+
           <div className="modal-row">
             <div className="modal-col">
               <label className="modal-label">Start time</label>
@@ -200,6 +276,35 @@ function AddEventModal({ onClose, onAdd }) {
             </div>
           </div>
           <div className="modal-duration-hint">Duration: {Math.floor(form.durH)}h {Math.round((form.durH%1)*60)>0?`${Math.round((form.durH%1)*60)}m`:""}</div>
+
+          <div className="modal-row">
+            <div className="modal-col">
+              <label className="modal-label">Priority</label>
+              <div className="pill-group">
+                {["high","medium","low"].map(p=>(
+                  <button key={p} onClick={()=>set("priority",p)}
+                    className={`pill-btn${form.priority===p?" pill-active":""}`}
+                    data-priority={p}>
+                    {p.charAt(0).toUpperCase()+p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-col">
+              <label className="modal-label">Task type</label>
+              <div className="pill-group">
+                {["fixed","flexible","free"].map(t=>(
+                  <button key={t} onClick={()=>set("taskType",t)}
+                    className={`pill-btn${form.taskType===t?" pill-active":""}`}>
+                    {TASK_TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <RepeatPicker repeat={form.repeat} onChange={v=>set("repeat",v)}/>
+
           <label className="modal-label">Color</label>
           <div className="color-picker-row">
             {EVENT_COLORS.map(c=>(
@@ -220,29 +325,20 @@ function AddEventModal({ onClose, onAdd }) {
   );
 }
 
-// ── Single day column ──
-function DayColumn({ dayOffset, events, activeId, onClickEvent }) {
-  const laid = useMemo(()=>layoutEvents(events),[events]);
-  return (
-    <div className="day-column">
-      <div className="day-col-header">{dayOffset===0?"Today":dayLabel(1)}</div>
-      <div style={{position:"relative",height:TOTAL_HOURS*HOUR_PX}}>
-        {laid.map(({ev,colIndex,totalCols})=>(
-          <DayEvent key={ev.id} ev={ev} colIndex={colIndex} totalCols={totalCols}
-            dimmed={ev.id===activeId} onClickEvent={onClickEvent}/>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Draggable event inside a day column ──
-function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent }) {
+// ── Draggable Event Block ──
+function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent, bedtimeH }) {
   const {attributes,listeners,setNodeRef,transform,isDragging}=useDraggable({id:ev.id});
   const c=getColor(ev.color);
   const GAP=3;
   const widthPct  = totalCols>1?`calc(${100/totalCols}% - ${GAP}px)`:"calc(100% - 4px)";
-  const leftOffset= totalCols>1?`calc(${(colIndex/totalCols)*100}% + ${colIndex*GAP/totalCols}px)`:"2px";
+  const leftOffset= totalCols>1?`calc(${(colIndex/totalCols)*100}% + ${colIndex*(GAP/totalCols)}px)`:"2px";
+
+  const badge = deriveBadge(ev.priority, ev.taskType);
+
+  // Check if this event overlaps with bedtime
+  const evEnd=ev.startH+ev.durH;
+  const showWindown = bedtimeH>0 && ev.startH<bedtimeH && evEnd>bedtimeH;
+
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className="cal-event"
       style={{
@@ -256,7 +352,8 @@ function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent }) {
       onClick={()=>{if(!transform) onClickEvent(ev);}}>
       <div className="cal-event-title">{ev.title}</div>
       <div className="cal-event-time">{fmtH(ev.startH)} – {fmtH(ev.startH+ev.durH)}</div>
-      {ev.badge&&<div className="sleep-badge">{ev.badge}</div>}
+      {badge&&!showWindown&&<div className="sleep-badge">{badge}</div>}
+      {showWindown&&<div className="winddown-badge">Wind down by {fmtH(bedtimeH)}</div>}
     </div>
   );
 }
@@ -293,7 +390,6 @@ function MonthCalendar({ selectedDay, onSelectDay, eventDays }) {
       </div>
       <div className="month-grid">
         {DAYS.map((d,i)=><div key={i} className="day-label">{d}</div>)}
-        {/* faint separator line under day letters */}
         <div className="day-label-underline"/>
         {Array.from({length:firstDow}).map((_,i)=><div key={`b${i}`} className="day-cell empty"/>)}
         {Array.from({length:daysInMonth},(_,i)=>i+1).map(d=>{
@@ -374,14 +470,12 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
   const [bedtime,   setBedtime]   = useState("23:00");
   const [waketime,  setWaketime]  = useState("06:40");
   const [goalHours, setGoalHours] = useState(8);
-
   const totalHours=calcSleepHours(bedtime,waketime);
   const stages=estimateStages(totalHours);
   const totalMin=Math.round(totalHours*60);
   const score=Math.min(100,Math.round((totalHours/goalHours)*100));
   const r=34,circ=2*Math.PI*r,offset=circ-(score/100)*circ;
   const avgDiff=Math.round((totalHours-6.47)*60);
-
   return (
     <div className="sleep-section">
       <div className="panel-title">Sleep health</div>
@@ -399,7 +493,6 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
           <div className="sleep-meta-label">Last night</div>
         </div>
       </div>
-
       <div className="sleep-bars">
         {[
           {label:"Deep",  mins:stages.deep,  color:"#534ab7"},
@@ -415,19 +508,15 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
           </div>
         ))}
       </div>
-
       <div className="sleep-chips">
-        {/* Editable bedtime */}
         <div className="sleep-chip sleep-chip-editable">
           <input className="sleep-time-chip-input" type="time" value={bedtime} onChange={e=>setBedtime(e.target.value)}/>
           <div className="sleep-chip-label">Bedtime</div>
         </div>
-        {/* Editable wake */}
         <div className="sleep-chip sleep-chip-editable">
           <input className="sleep-time-chip-input" type="time" value={waketime} onChange={e=>setWaketime(e.target.value)}/>
           <div className="sleep-chip-label">Wake</div>
         </div>
-        {/* Editable goal — centered */}
         <div className="sleep-chip sleep-chip-editable" style={{alignItems:"center",textAlign:"center"}}>
           <div className="sleep-chip-goal-row" style={{justifyContent:"center"}}>
             <input className="sleep-goal-input" type="number" min="4" max="12" step="0.5"
@@ -437,7 +526,6 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
           </div>
           <div className="sleep-chip-label">Sleep goal</div>
         </div>
-        {/* vs avg */}
         <div className="sleep-chip">
           <div className="sleep-chip-val" style={{color:avgDiff>=0?"#84cc16":"#f87171"}}>
             {avgDiff>=0?"+":""}{avgDiff}m
@@ -445,7 +533,6 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
           <div className="sleep-chip-label">vs avg · 3× restless</div>
         </div>
       </div>
-
       {showTip&&<SleepTip tip={tip} onDismiss={onDismissTip} onDontShow={onDontShowTip}/>}
     </div>
   );
@@ -480,6 +567,40 @@ function AIChat() {
   );
 }
 
+// ── Day Column (renders hour lines + events + bedtime line) ──
+function DayColumn({ dayOffset, events, activeId, onClickEvent, bedtimeH, nowRef }) {
+  const laid = useMemo(()=>layoutEvents(events),[events]);
+  const hasEventAtBedtime = events.some(ev=>bedtimeH>0&&ev.startH<bedtimeH&&ev.startH+ev.durH>bedtimeH);
+  return (
+    <div className="day-col-wrap" style={{height:TOTAL_HOURS*HOUR_PX}}>
+      {/* hour bg lines */}
+      {Array.from({length:TOTAL_HOURS},(_,h)=>(
+        <div key={h} style={{position:"absolute",top:h*HOUR_PX,left:0,right:0,pointerEvents:"none"}}>
+          <div className="hour-bg-line"/>
+          <div className="half-bg-line"/>
+        </div>
+      ))}
+      {/* events */}
+      {laid.map(({ev,colIndex,totalCols})=>(
+        <DayEvent key={ev.id} ev={ev} colIndex={colIndex} totalCols={totalCols}
+          dimmed={ev.id===activeId} onClickEvent={onClickEvent} bedtimeH={bedtimeH}/>
+      ))}
+      {/* bedtime line */}
+      {bedtimeH>0&&(
+        <div className="bedtime-line" style={{top:bedtimeH*HOUR_PX}}>
+          <span className="bedtime-line-label">{fmtH(bedtimeH)} bedtime</span>
+        </div>
+      )}
+      {/* now line — only on today (dayOffset===0) */}
+      {dayOffset===0&&nowRef&&(
+        <div ref={nowRef} className="now-line" style={{position:"absolute",left:0,right:0}}>
+          <div className="now-dot"/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root App ──
 export default function App() {
   const [events,      setEvents]      = useState(INITIAL_EVENTS);
@@ -492,22 +613,22 @@ export default function App() {
   const [tip]                         = useState(()=>randomTip());
   const [showTip,     setShowTip]     = useState(true);
   const [bedtime,     setBedtime]     = useState("23:00");
-  // responsive: track if center is wide enough for two columns
-  const [dualDay,     setDualDay]     = useState(true);
+  const [numDays,     setNumDays]     = useState(2); // responsive
 
   const scrollRef=useRef(), nowRef=useRef(), centerRef=useRef();
   const activeEv=events.find(e=>e.id===activeId);
   const sensors=useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}));
-
+  const bedtimeH = inputToH(bedtime);
   const todayDate=new Date();
   const eventDays=[todayDate.getDate()];
 
-  // Observe center panel width to switch between 1 and 2 day columns
+  // Responsive: watch center panel width
   useEffect(()=>{
     if(!centerRef.current) return;
     const ro=new ResizeObserver(entries=>{
       const w=entries[0].contentRect.width;
-      setDualDay(w>=600);
+      if(w>=580) setNumDays(2);
+      else setNumDays(1);
     });
     ro.observe(centerRef.current);
     return()=>ro.disconnect();
@@ -550,6 +671,12 @@ export default function App() {
   const todayEvents    = events.filter(e=>e.day===0);
   const tomorrowEvents = events.filter(e=>e.day===1);
 
+  // Build array of columns to show
+  const dayCols = numDays===2
+    ? [{offset:0,label:"Today",    evs:todayEvents},
+       {offset:1,label:"Tomorrow", evs:tomorrowEvents}]
+    : [{offset:0,label:"Today",    evs:todayEvents}];
+
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="app">
@@ -567,7 +694,6 @@ export default function App() {
           </div>
 
           <div className="center-panel" ref={centerRef}>
-            {/* Header: Today label + bedtime input + add button */}
             <div className="today-header">
               <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
                 <span className="today-label">Today</span>
@@ -590,11 +716,10 @@ export default function App() {
               </div>
             )}
 
-            {/* Calendar scroll area */}
+            {/* Calendar: hour labels + day columns in a flex row */}
             <div className="cal-scroll-area" ref={scrollRef}>
               <div className="cal-grid-inner">
-
-                {/* Hour labels column */}
+                {/* Hour labels */}
                 <div className="hour-labels-col">
                   {Array.from({length:TOTAL_HOURS},(_,h)=>(
                     <div key={h} className="hour-label-row" style={{height:HOUR_PX}}>
@@ -603,45 +728,33 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Today column */}
-                <div className="day-col-wrap">
-                  {/* half-hour lines behind events */}
-                  {Array.from({length:TOTAL_HOURS},(_,h)=>(
-                    <div key={h} className="hour-bg-row" style={{top:h*HOUR_PX,height:HOUR_PX}}>
-                      <div className="hour-bg-line"/>
-                      <div className="half-bg-line"/>
-                    </div>
-                  ))}
-                  <div style={{position:"absolute",top:0,left:0,right:0,height:TOTAL_HOURS*HOUR_PX}}>
-                    {layoutEvents(todayEvents).map(({ev,colIndex,totalCols})=>(
-                      <DayEvent key={ev.id} ev={ev} colIndex={colIndex} totalCols={totalCols}
-                        dimmed={ev.id===activeId} onClickEvent={setModalEv}/>
-                    ))}
-                  </div>
-                  {/* now line only on today column */}
-                  <div ref={nowRef} className="now-line" style={{position:"absolute",left:0,right:0}}>
-                    <div className="now-dot"/>
-                  </div>
-                </div>
-
-                {/* Tomorrow column — only when wide enough */}
-                {dualDay&&(
-                  <div className="day-col-wrap day-col-tomorrow">
-                    {Array.from({length:TOTAL_HOURS},(_,h)=>(
-                      <div key={h} className="hour-bg-row" style={{top:h*HOUR_PX,height:HOUR_PX}}>
-                        <div className="hour-bg-line"/>
-                        <div className="half-bg-line"/>
+                {/* Day columns — flex:1 each so they split space evenly */}
+                <div className="day-cols-flex">
+                  {/* Column headers row */}
+                  <div className="day-headers-row">
+                    {dayCols.map(col=>(
+                      <div key={col.offset} className="day-col-header-cell">
+                        {col.label} — {dayLabel(col.offset)}
                       </div>
                     ))}
-                    <div style={{position:"absolute",top:0,left:0,right:0,height:TOTAL_HOURS*HOUR_PX}}>
-                      {layoutEvents(tomorrowEvents).map(({ev,colIndex,totalCols})=>(
-                        <DayEvent key={ev.id} ev={ev} colIndex={colIndex} totalCols={totalCols}
-                          dimmed={ev.id===activeId} onClickEvent={setModalEv}/>
-                      ))}
-                    </div>
                   </div>
-                )}
-
+                  {/* Columns */}
+                  <div className="day-cols-body">
+                    {dayCols.map((col,i)=>(
+                      <div key={col.offset} className={`day-col-flex-item${i>0?" day-col-divider":""}`}
+                        style={{height:TOTAL_HOURS*HOUR_PX,position:"relative"}}>
+                        <DayColumn
+                          dayOffset={col.offset}
+                          events={col.evs}
+                          activeId={activeId}
+                          onClickEvent={setModalEv}
+                          bedtimeH={bedtimeH}
+                          nowRef={col.offset===0?nowRef:null}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
