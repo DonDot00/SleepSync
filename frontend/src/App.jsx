@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { DndContext, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import "./App.css";
 
@@ -35,15 +35,15 @@ const SLEEP_TIPS = [
   "Avoid napping after 4pm — it will delay your sleep onset.",
   "Even 15 minutes of morning sunlight improves sleep onset time at night.",
   "A warm bath 1–2 hours before bed lowers core body temperature and promotes sleep.",
-  "Pink noise (like rain) has shown stronger sleep benefits than white noise.",
+  "Pink noise has shown stronger sleep benefits than white noise.",
   "Your body repairs muscle during deep sleep — prioritize it after hard workouts.",
   "Limit water intake 2 hours before bed to reduce nighttime waking.",
-  "Going to bed slightly earlier than usual is one of the fastest ways to improve your sleep score.",
-  "Power down devices 30 minutes before bed and use that time for stretching or breathing.",
-  "Sleep quality matters more than quantity — 7 hours of deep sleep beats 9 hours of light sleep.",
+  "Going to bed slightly earlier is one of the fastest ways to improve your sleep score.",
+  "Power down devices 30 minutes before bed and use that time for stretching.",
+  "Sleep quality matters more than quantity.",
   "Keep a sleep log for two weeks — patterns often reveal surprising causes of poor sleep.",
-  "The first 90 minutes of sleep contain the most deep slow-wave sleep of the night.",
-  "Morning light exposure advances your circadian rhythm — useful if you want to sleep earlier.",
+  "The first 90 minutes of sleep contain the most deep slow-wave sleep.",
+  "Morning light exposure advances your circadian rhythm.",
   "Sleep deprivation impairs emotional regulation more than almost any other cognitive function.",
   "A short walk after dinner improves blood sugar and can improve sleep quality.",
   "Weighted blankets have shown measurable improvements in sleep for people with anxiety.",
@@ -51,14 +51,14 @@ const SLEEP_TIPS = [
 ];
 
 const EVENT_COLORS = [
-  { id:"purple", label:"Purple", bg:"#2a2050", border:"#7f77dd", text:"#a78fff" },
-  { id:"teal",   label:"Teal",   bg:"#0d2820", border:"#1d9e75", text:"#5dcaa5" },
-  { id:"pink",   label:"Pink",   bg:"#2a1020", border:"#d4537e", text:"#ed93b1" },
-  { id:"gray",   label:"Gray",   bg:"#1a1828", border:"#444441", text:"#888780" },
-  { id:"blue",   label:"Blue",   bg:"#0d1a30", border:"#3b82f6", text:"#60a5fa" },
-  { id:"amber",  label:"Amber",  bg:"#2a1a00", border:"#d97706", text:"#fbbf24" },
-  { id:"red",    label:"Red",    bg:"#2a0a10", border:"#ef4444", text:"#f87171" },
-  { id:"green",  label:"Green",  bg:"#0a2010", border:"#22c55e", text:"#4ade80" },
+  { id:"purple", bg:"#2a2050", border:"#7f77dd", text:"#a78fff" },
+  { id:"teal",   bg:"#0d2820", border:"#1d9e75", text:"#5dcaa5" },
+  { id:"pink",   bg:"#2a1020", border:"#d4537e", text:"#ed93b1" },
+  { id:"gray",   bg:"#1a1828", border:"#444441", text:"#888780" },
+  { id:"blue",   bg:"#0d1a30", border:"#3b82f6", text:"#60a5fa" },
+  { id:"amber",  bg:"#2a1a00", border:"#d97706", text:"#fbbf24" },
+  { id:"red",    bg:"#2a0a10", border:"#ef4444", text:"#f87171" },
+  { id:"green",  bg:"#0a2010", border:"#22c55e", text:"#4ade80" },
 ];
 
 const INITIAL_EVENTS = [
@@ -87,32 +87,60 @@ function inputToH(str) { const [h,m]=str.split(":").map(Number); return h+m/60; 
 function randomTip()   { return SLEEP_TIPS[Math.floor(Math.random()*SLEEP_TIPS.length)]; }
 function getColor(id)  { return EVENT_COLORS.find(c=>c.id===id)||EVENT_COLORS[0]; }
 
-// Given bedtime and wake time strings (HH:MM), compute total sleep hours
 function calcSleepHours(bedtime, waketime) {
-  const b = inputToH(bedtime);
-  const w = inputToH(waketime);
-  // handle crossing midnight
-  return w > b ? w - b : (24 - b) + w;
+  const b=inputToH(bedtime), w=inputToH(waketime);
+  return w>b ? w-b : (24-b)+w;
 }
-
-// Estimate sleep stages from total hours (adult averages)
 function estimateStages(totalHours) {
-  const totalMin = totalHours * 60;
-  return {
-    light: Math.round(totalMin * 0.50),  // ~50%
-    deep:  Math.round(totalMin * 0.18),  // ~18%
-    rem:   Math.round(totalMin * 0.22),  // ~22%
-  };
+  const m=totalHours*60;
+  return { light:Math.round(m*0.50), deep:Math.round(m*0.18), rem:Math.round(m*0.22) };
 }
-
 function fmtMins(mins) {
   const h=Math.floor(mins/60), m=mins%60;
   return m===0?`${h}h`:`${h}h ${m}m`;
 }
 
+// ── Overlap layout engine ──
+// Groups events into columns so overlapping ones sit side-by-side
+function layoutEvents(events) {
+  if (!events.length) return [];
+  const sorted = [...events].sort((a,b)=>a.startH-b.startH);
+  const columns = []; // each column is array of events
+
+  sorted.forEach(ev => {
+    const endH = ev.startH + ev.durH;
+    // find first column where last event doesn't overlap this one
+    let placed = false;
+    for (let c=0; c<columns.length; c++) {
+      const last = columns[c][columns[c].length-1];
+      if (last.startH + last.durH <= ev.startH) {
+        columns[c].push(ev);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) columns.push([ev]);
+  });
+
+  // Now figure out for each event: which column group it belongs to,
+  // how many columns share its time slot, its column index
+  const result = [];
+  events.forEach(ev => {
+    const evEnd = ev.startH + ev.durH;
+    // find all columns that have an event overlapping this event's time range
+    const overlappingCols = columns.filter(col =>
+      col.some(other => other.startH < evEnd && other.startH + other.durH > ev.startH)
+    );
+    const colIndex = overlappingCols.findIndex(col => col.includes(ev));
+    const totalCols = overlappingCols.length;
+    result.push({ ev, colIndex, totalCols });
+  });
+  return result;
+}
+
 // ── Event Modal ──
 function EventModal({ ev, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState({...ev});
+  const [form,setForm]=useState({...ev});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const endH=form.startH+form.durH;
   const setEnd=(val)=>{ const e=inputToH(val); setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)})); };
@@ -147,7 +175,7 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
             {EVENT_COLORS.map(c=>(
               <button key={c.id} onClick={()=>set("color",c.id)}
                 className={`color-swatch${form.color===c.id?" selected":""}`}
-                style={{background:c.bg,borderColor:c.border}} title={c.label}>
+                style={{background:c.bg,borderColor:c.border}} title={c.id}>
                 {form.color===c.id&&<span className="color-swatch-check" style={{color:c.text}}>✓</span>}
               </button>
             ))}
@@ -199,7 +227,7 @@ function AddEventModal({ onClose, onAdd }) {
             {EVENT_COLORS.map(c=>(
               <button key={c.id} onClick={()=>set("color",c.id)}
                 className={`color-swatch${form.color===c.id?" selected":""}`}
-                style={{background:c.bg,borderColor:c.border}} title={c.label}>
+                style={{background:c.bg,borderColor:c.border}} title={c.id}>
                 {form.color===c.id&&<span className="color-swatch-check" style={{color:c.text}}>✓</span>}
               </button>
             ))}
@@ -215,22 +243,39 @@ function AddEventModal({ onClose, onAdd }) {
 }
 
 // ── Draggable Event ──
-function CalEvent({ ev, dimmed, onClickEvent }) {
+function CalEvent({ ev, colIndex, totalCols, dimmed, onClickEvent }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id:ev.id });
-  const c=getColor(ev.color);
+  const c = getColor(ev.color);
+
+  // Calculate width and left offset based on column layout
+  const GAP = 3;
+  const widthPct  = totalCols > 1 ? `calc(${100/totalCols}% - ${GAP}px)` : "100%";
+  const leftOffset = totalCols > 1 ? `calc(${(colIndex/totalCols)*100}% + ${colIndex*GAP/totalCols}px)` : "0";
+
   return (
-    <div ref={setNodeRef} {...listeners} {...attributes} className="cal-event"
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className="cal-event"
       style={{
-        top:ev.startH*HOUR_PX, height:Math.max(ev.durH*HOUR_PX-3,26),
-        transform:transform?`translate3d(${transform.x}px,${transform.y}px,0)`:undefined,
-        opacity:dimmed?0.3:1, zIndex:isDragging?50:2,
-        cursor:isDragging?"grabbing":"pointer",
-        background:c.bg, borderLeft:`2px solid ${c.border}`, color:c.text,
+        top:        ev.startH * HOUR_PX,
+        height:     Math.max(ev.durH * HOUR_PX - 3, 26),
+        width:      widthPct,
+        left:       leftOffset,
+        transform:  transform ? `translate3d(${transform.x}px,${transform.y}px,0)` : undefined,
+        opacity:    dimmed ? 0.3 : 1,
+        zIndex:     isDragging ? 50 : colIndex + 2,
+        cursor:     isDragging ? "grabbing" : "pointer",
+        background: c.bg,
+        borderLeft: `2px solid ${c.border}`,
+        color:      c.text,
       }}
-      onClick={()=>{ if(!transform) onClickEvent(ev); }}>
+      onClick={()=>{ if(!transform) onClickEvent(ev); }}
+    >
       <div className="cal-event-title">{ev.title}</div>
       <div className="cal-event-time">{fmtH(ev.startH)} – {fmtH(ev.startH+ev.durH)}</div>
-      {ev.badge&&<div className="sleep-badge">{ev.badge}</div>}
+      {ev.badge && <div className="sleep-badge">{ev.badge}</div>}
     </div>
   );
 }
@@ -259,11 +304,11 @@ function MonthCalendar({ selectedDay, onSelectDay, eventDays }) {
   return (
     <div>
       <div className="cal-nav">
-        <button className="cal-nav-btn" onClick={()=>setViewYear(y=>y-1)} title="Previous year">«</button>
-        <button className="cal-nav-btn" onClick={prevMonth} title="Previous month">‹</button>
+        <button className="cal-nav-btn" onClick={()=>setViewYear(y=>y-1)}>«</button>
+        <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
         <span className="cal-nav-label">{MONTHS[viewMonth]} {viewYear}</span>
-        <button className="cal-nav-btn" onClick={nextMonth} title="Next month">›</button>
-        <button className="cal-nav-btn" onClick={()=>setViewYear(y=>y+1)} title="Next year">»</button>
+        <button className="cal-nav-btn" onClick={nextMonth}>›</button>
+        <button className="cal-nav-btn" onClick={()=>setViewYear(y=>y+1)}>»</button>
       </div>
       <div className="month-grid">
         {DAYS.map((d,i)=><div key={i} className="day-label">{d}</div>)}
@@ -316,14 +361,12 @@ function EnergySlider({ value, onChange }) {
   const colors=["#ef4444","#f97316","#eab308","#84cc16","#22c55e"];
   return (
     <div className="energy-panel">
-      <div className="energy-header">
-        <span className="energy-title">Energy</span>
-        <input type="range" min="1" max="5" step="1" value={value}
-          onChange={e=>onChange(parseInt(e.target.value))}
-          className="energy-slider"
-          style={{"--thumb-color":colors[value-1]}}/>
-        <span className="energy-label" style={{color:colors[value-1]}}>{labels[value-1]}</span>
-      </div>
+      <span className="energy-title">Energy</span>
+      <input type="range" min="1" max="5" step="1" value={value}
+        onChange={e=>onChange(parseInt(e.target.value))}
+        className="energy-slider"
+        style={{"--thumb-color":colors[value-1]}}/>
+      <span className="energy-label" style={{color:colors[value-1]}}>{labels[value-1]}</span>
     </div>
   );
 }
@@ -344,27 +387,23 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-// ── Sleep Health Panel ──
+// ── Sleep Health ──
 function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
-  // User-editable sleep times
-  const [bedtime,  setBedtime]  = useState("23:00");
-  const [waketime, setWaketime] = useState("06:40");
-  // User-editable sleep goal (hours)
+  const [bedtime,   setBedtime]   = useState("23:00");
+  const [waketime,  setWaketime]  = useState("06:40");
   const [goalHours, setGoalHours] = useState(8);
 
   const totalHours = calcSleepHours(bedtime, waketime);
   const stages     = estimateStages(totalHours);
-  const score      = Math.min(100, Math.round((totalHours / goalHours) * 100 * 0.74)); // simple score
+  const totalMin   = Math.round(totalHours * 60);
+  const score      = Math.min(100, Math.round((totalHours / goalHours) * 100));
   const r=34, circ=2*Math.PI*r, offset=circ-(Math.min(score,100)/100)*circ;
-
-  // avg diff for "vs avg" chip — hardcoded demo
-  const avgDiff = Math.round((totalHours - 6.47) * 60); // mins vs 6h28m avg
+  const avgDiff    = Math.round((totalHours - 6.47) * 60);
 
   return (
     <div className="sleep-section">
       <div className="panel-title">Sleep health</div>
 
-      {/* Ring + meta */}
       <div className="sleep-ring-row">
         <div className="ring-wrap" style={{width:80,height:80}}>
           <svg width="80" height="80" viewBox="0 0 80 80" style={{transform:"rotate(-90deg)"}}>
@@ -375,69 +414,53 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip }) {
           <div className="ring-center" style={{fontSize:18}}>{score}</div>
         </div>
         <div className="sleep-meta">
-          <div className="sleep-meta-val" style={{fontSize:22}}>{fmtMins(Math.round(totalHours*60))}</div>
+          <div className="sleep-meta-val" style={{fontSize:22}}>{fmtMins(totalMin)}</div>
           <div className="sleep-meta-label">Last night</div>
-
-          {/* Editable bedtime / wake */}
-          <div className="sleep-time-row">
-            <div className="sleep-time-field">
-              <span className="sleep-time-label">Bed</span>
-              <input className="sleep-time-input" type="time" value={bedtime}
-                onChange={e=>setBedtime(e.target.value)}/>
-            </div>
-            <div className="sleep-time-sep">→</div>
-            <div className="sleep-time-field">
-              <span className="sleep-time-label">Wake</span>
-              <input className="sleep-time-input" type="time" value={waketime}
-                onChange={e=>setWaketime(e.target.value)}/>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Sleep stage bars — update based on inputs */}
       <div className="sleep-bars">
         {[
-          {label:"Deep",  mins:stages.deep,  total:Math.round(totalHours*60), color:"#534ab7"},
-          {label:"REM",   mins:stages.rem,   total:Math.round(totalHours*60), color:"#7f77dd"},
-          {label:"Light", mins:stages.light, total:Math.round(totalHours*60), color:"#3c3489"},
+          {label:"Deep",  mins:stages.deep,  color:"#534ab7"},
+          {label:"REM",   mins:stages.rem,   color:"#7f77dd"},
+          {label:"Light", mins:stages.light, color:"#3c3489"},
         ].map(b=>(
           <div key={b.label} className="bar-row">
             <span className="bar-label">{b.label}</span>
             <div className="bar-track">
-              <div className="bar-fill" style={{width:`${Math.round((b.mins/b.total)*100)}%`,background:b.color}}/>
+              <div className="bar-fill" style={{width:`${Math.round((b.mins/totalMin)*100)}%`,background:b.color}}/>
             </div>
             <span className="bar-val">{fmtMins(b.mins)}</span>
           </div>
         ))}
       </div>
 
-      {/* Chips — goal is editable, avg diff moved into chip */}
+      {/* Chips — bedtime and wake now editable here */}
       <div className="sleep-chips">
-        <div className="sleep-chip">
-          <div className="sleep-chip-val">{bedtime}</div>
+        {/* Bedtime chip — editable */}
+        <div className="sleep-chip sleep-chip-editable">
+          <input className="sleep-time-chip-input" type="time" value={bedtime}
+            onChange={e=>setBedtime(e.target.value)}/>
           <div className="sleep-chip-label">Bedtime</div>
         </div>
-        <div className="sleep-chip">
-          <div className="sleep-chip-val">{waketime}</div>
+        {/* Wake chip — editable */}
+        <div className="sleep-chip sleep-chip-editable">
+          <input className="sleep-time-chip-input" type="time" value={waketime}
+            onChange={e=>setWaketime(e.target.value)}/>
           <div className="sleep-chip-label">Wake</div>
         </div>
-        {/* Editable sleep goal chip */}
+        {/* Goal chip — editable */}
         <div className="sleep-chip sleep-chip-editable">
           <div className="sleep-chip-goal-row">
-            <input
-              className="sleep-goal-input"
-              type="number" min="4" max="12" step="0.5"
-              value={goalHours}
-              onChange={e=>setGoalHours(parseFloat(e.target.value))}
-            />
-            <span className="sleep-goal-unit">h goal</span>
+            <input className="sleep-goal-input" type="number" min="4" max="12" step="0.5"
+              value={goalHours} onChange={e=>setGoalHours(parseFloat(e.target.value))}/>
+            <span className="sleep-goal-unit">h</span>
           </div>
           <div className="sleep-chip-label">Sleep goal</div>
         </div>
-        {/* vs avg chip — includes the +12 from avg */}
+        {/* vs avg + restless */}
         <div className="sleep-chip">
-          <div className="sleep-chip-val" style={{color: avgDiff>=0?"#84cc16":"#f87171"}}>
+          <div className="sleep-chip-val" style={{color:avgDiff>=0?"#84cc16":"#f87171"}}>
             {avgDiff>=0?"+":""}{avgDiff}m
           </div>
           <div className="sleep-chip-label">vs avg · 3× restless</div>
@@ -487,16 +510,18 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [energy,      setEnergy]      = useState(3);
   const [showEnWarn,  setShowEnWarn]  = useState(true);
-  const [tip,         setTip]         = useState(()=>randomTip());
+  const [tip,         ]               = useState(()=>randomTip());
   const [showTip,     setShowTip]     = useState(true);
 
   const scrollRef=useRef(), nowRef=useRef();
   const activeEv=events.find(e=>e.id===activeId);
-
   const sensors=useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}));
 
   const today=new Date();
-  const eventDays=[...new Set(events.map(()=>today.getDate()))];
+  const eventDays=[today.getDate()];
+
+  // Compute overlap layout whenever events change
+  const laid = useMemo(()=>layoutEvents(events),[events]);
 
   useEffect(()=>{
     if(scrollRef.current){
@@ -515,7 +540,6 @@ export default function App() {
     return()=>clearInterval(t);
   },[]);
 
-  // reset warning visibility when energy changes
   useEffect(()=>{ setShowEnWarn(true); },[energy]);
 
   const onDragStart=({active})=>setActiveId(active.id);
@@ -529,9 +553,9 @@ export default function App() {
     }));
   };
 
-  const handleSave   =(updated)=>{setEvents(p=>p.map(ev=>ev.id===updated.id?updated:ev));setModalEv(null);};
-  const handleDelete =(id)=>{setEvents(p=>p.filter(ev=>ev.id!==id));setModalEv(null);};
-  const handleAdd    =(newEv)=>setEvents(p=>[...p,newEv]);
+  const handleSave  =(updated)=>{setEvents(p=>p.map(ev=>ev.id===updated.id?updated:ev));setModalEv(null);};
+  const handleDelete=(id)=>{setEvents(p=>p.filter(ev=>ev.id!==id));setModalEv(null);};
+  const handleAdd   =(newEv)=>setEvents(p=>[...p,newEv]);
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -541,7 +565,7 @@ export default function App() {
           <span className="topbar-date">
             {today.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}
           </span>
-          <div className="topbar-score"><span className="score-dot"/>Sleep score: 74</div>
+          <div className="topbar-score"><span className="score-dot"/>Sleep score: {Math.min(100,Math.round((calcSleepHours("23:00","06:40")/8)*100))}</div>
         </div>
 
         <div className="main">
@@ -579,8 +603,11 @@ export default function App() {
                   <div key={`hh${h}`} className="half-hour-line" style={{top:(h+0.5)*HOUR_PX}}/>
                 ))}
                 <div className="events-layer">
-                  {events.map(ev=>(
-                    <CalEvent key={ev.id} ev={ev} dimmed={ev.id===activeId} onClickEvent={setModalEv}/>
+                  {laid.map(({ev,colIndex,totalCols})=>(
+                    <CalEvent key={ev.id} ev={ev}
+                      colIndex={colIndex} totalCols={totalCols}
+                      dimmed={ev.id===activeId}
+                      onClickEvent={setModalEv}/>
                   ))}
                 </div>
                 <div ref={nowRef} className="now-line"><div className="now-dot"/></div>

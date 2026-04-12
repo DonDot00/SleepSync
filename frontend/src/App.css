@@ -63,54 +63,74 @@ body{background:#080610;font-family:'Rubik',sans-serif;color:#e8e4f0}
 .add-event-btn{background:#2a2050;border:0.5px solid #534ab7;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;color:#a78fff;cursor:pointer;transition:background 0.15s;white-space:nowrap}
 .add-event-btn:hover{background:#3d3060}
 
-/* ── Energy slider — compact single row ── */
-.energy-panel{flex-shrink:0;padding:7px 20px;border-bottom:0.5px solid #1e1830;background:#090711}
-.energy-header{display:flex;align-items:center;gap:10px}
+/* ── Energy — compact single row, NO overflow-x ── */
+.energy-panel{
+  flex-shrink:0;
+  display:flex;align-items:center;gap:10px;
+  padding:7px 20px;
+  border-bottom:0.5px solid #1e1830;
+  background:#090711;
+  overflow:hidden;   /* prevents any horizontal overflow */
+}
 .energy-title{font-size:10px;font-weight:500;color:#4a4060;letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
 .energy-label{font-size:11px;font-weight:500;white-space:nowrap;flex-shrink:0;min-width:62px;text-align:right}
-.energy-slider{flex:1;height:4px;-webkit-appearance:none;appearance:none;background:linear-gradient(to right,#ef4444,#f97316,#eab308,#84cc16,#22c55e);border-radius:2px;outline:none;cursor:pointer}
-.energy-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--thumb-color,#7f77dd);border:2px solid #090711;cursor:pointer;transition:transform 0.15s}
+.energy-slider{
+  flex:1;min-width:0;   /* min-width:0 prevents flexbox overflow */
+  height:4px;
+  -webkit-appearance:none;appearance:none;
+  background:linear-gradient(to right,#ef4444,#f97316,#eab308,#84cc16,#22c55e);
+  border-radius:2px;outline:none;cursor:pointer;
+}
+.energy-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--thumb-color,#7f77dd);
+  border:2px solid #090711;cursor:pointer;
+  transition:transform 0.15s;
+}
 .energy-slider::-webkit-slider-thumb:hover{transform:scale(1.2)}
 
-/* energy warning — with close button */
 .energy-warning{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:6px 20px;background:#1a1400;border-bottom:0.5px solid #534a00;gap:10px}
 .energy-warning span{font-size:11px;color:#c4a800}
 .energy-warn-close{background:none;border:none;color:#7a6a00;font-size:14px;cursor:pointer;padding:1px 5px;border-radius:4px;flex-shrink:0;transition:color 0.15s}
 .energy-warn-close:hover{color:#c4a800}
 
+/* ── Calendar scroll ── */
 .cal-scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;position:relative}
 .hour-grid{position:relative}
 .hour-row{position:absolute;left:0;right:0;display:flex;align-items:flex-start;pointer-events:none}
 .hour-label{width:52px;flex-shrink:0;font-size:10px;color:#3a3460;padding:0 10px 0 14px;transform:translateY(-7px);text-align:right}
 .hour-line{flex:1;height:0;border-top:0.5px solid #1a1728}
 .half-hour-line{position:absolute;left:52px;right:0;height:0;border-top:0.5px dashed #12101e;pointer-events:none}
+
+/* events layer — position:absolute so overlap works */
 .events-layer{position:absolute;top:0;left:52px;right:6px}
-.cal-event{position:absolute;border-radius:6px;padding:6px 10px;overflow:hidden;user-select:none}
+
+.cal-event{
+  position:absolute;
+  border-radius:6px;
+  padding:6px 8px;
+  overflow:hidden;
+  user-select:none;
+  /* right is controlled inline via width+left */
+}
 .cal-event-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-event-time{font-size:10px;opacity:0.65;margin-top:2px}
 .sleep-badge{display:inline-flex;font-size:10px;background:#1e1830;color:#7f77dd;padding:2px 8px;border-radius:10px;border:0.5px solid #3d3060;margin-top:5px}
+
 .now-line{position:absolute;left:52px;right:0;height:1.5px;background:#a78fff;z-index:8;pointer-events:none}
 .now-dot{width:8px;height:8px;border-radius:50%;background:#a78fff;position:absolute;left:-4px;top:-3.5px}
 
 /* ── Right panel ── */
 .right-panel{display:flex;flex-direction:column;overflow:hidden;background:#08060f}
 
-/* Sleep health */
 .sleep-section{flex:0 0 62%;padding:14px;border-bottom:0.5px solid #1e1830;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0}
 .sleep-ring-row{display:flex;align-items:flex-start;gap:14px}
 .ring-wrap{position:relative;flex-shrink:0}
 .ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:500;color:#a78fff}
-.sleep-meta{display:flex;flex-direction:column;gap:4px;flex:1}
+.sleep-meta{display:flex;flex-direction:column;gap:3px}
 .sleep-meta-val{font-weight:500;color:#e8e4f0}
 .sleep-meta-label{font-size:11px;color:#4a4060}
-
-/* editable bedtime / wake inline */
-.sleep-time-row{display:flex;align-items:center;gap:6px;margin-top:4px}
-.sleep-time-field{display:flex;flex-direction:column;gap:2px}
-.sleep-time-label{font-size:9px;color:#4a4060;letter-spacing:0.05em;text-transform:uppercase}
-.sleep-time-input{background:#1a1228;border:0.5px solid #2a2040;border-radius:5px;padding:3px 6px;font-size:11px;color:#c4b8e8;outline:none;width:80px;font-family:'Rubik',sans-serif}
-.sleep-time-input:focus{border-color:#534ab7}
-.sleep-time-sep{font-size:11px;color:#3a3460;margin-top:12px}
 
 .sleep-bars{display:flex;flex-direction:column;gap:7px}
 .bar-row{display:flex;align-items:center;gap:8px}
@@ -123,11 +143,26 @@ body{background:#080610;font-family:'Rubik',sans-serif;color:#e8e4f0}
 .sleep-chip{background:#1a1228;border:0.5px solid #2a2040;border-radius:8px;padding:8px 10px}
 .sleep-chip-val{font-size:14px;font-weight:500;color:#c4b8e8}
 .sleep-chip-label{font-size:10px;color:#4a4060;margin-top:2px}
-
-/* editable goal chip */
 .sleep-chip-editable{display:flex;flex-direction:column;gap:2px}
+
+/* time input styled to look like chip value */
+.sleep-time-chip-input{
+  background:transparent;
+  border:none;
+  border-bottom:0.5px solid #3d3060;
+  width:100%;
+  font-size:13px;
+  font-weight:500;
+  color:#c4b8e8;
+  outline:none;
+  font-family:'Rubik',sans-serif;
+  padding:0;
+  cursor:pointer;
+}
+.sleep-time-chip-input:focus{border-bottom-color:#7f77dd}
+
 .sleep-chip-goal-row{display:flex;align-items:baseline;gap:4px}
-.sleep-goal-input{background:transparent;border:none;border-bottom:0.5px solid #3d3060;width:36px;font-size:14px;font-weight:500;color:#c4b8e8;outline:none;font-family:'Rubik',sans-serif;padding:0;text-align:left}
+.sleep-goal-input{background:transparent;border:none;border-bottom:0.5px solid #3d3060;width:36px;font-size:14px;font-weight:500;color:#c4b8e8;outline:none;font-family:'Rubik',sans-serif;padding:0}
 .sleep-goal-input:focus{border-bottom-color:#7f77dd}
 .sleep-goal-unit{font-size:11px;color:#4a4060}
 
