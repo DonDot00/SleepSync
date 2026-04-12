@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+# Pydantic models for task creation, update, and output
 class TaskCreate(BaseModel):
     name: str
     duration_minutes: int

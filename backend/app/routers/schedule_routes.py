@@ -6,6 +6,7 @@ from app.services.schedule_engine import generate_schedule
 
 router = APIRouter()
 
+# endpoint to generate a schedule based on current tasks and user preferences
 @router.get("/generate")
 def get_schedule(wake_time: str = "07:00", sleep_time: str = "23:00", db: Session = Depends(get_db)):
     tasks = db.query(Task).all()
