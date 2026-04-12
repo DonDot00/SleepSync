@@ -1,206 +1,115 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 body {
+  margin: 0;
   background: #080610;
-  font-family: 'Rubik', sans-serif;
-  color: #e8e4f0;
+  color: white;
+  font-family: sans-serif;
 }
 
-/* APP */
 .app {
   display: grid;
   grid-template-rows: 48px 1fr;
   height: 100vh;
-  background: #0d0b14;
 }
 
-/* TOP BAR */
 .topbar {
   background: #13101f;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 16px;
+  padding: 10px;
 }
 
-.logo {
-  color: #a78fff;
-}
-
-.topbar-date {
-  margin-left: auto;
-  color: #6b6080;
-}
-
-.topbar-score {
-  color: #a78fff;
-}
-
-/* MAIN LAYOUT */
 .main {
   display: grid;
-  grid-template-columns: 190px 520px 1fr;
-  height: 100%;
+  grid-template-columns: 200px 1fr 250px;
 }
 
 /* LEFT */
 .left-panel {
-  border-right: 1px solid #1e1830;
-  padding: 14px;
+  border-right: 1px solid #222;
+  padding: 10px;
 }
 
 .month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
 }
 
 .day-cell {
   padding: 6px;
-  text-align: center;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.day-cell:hover {
-  background: #1e1830;
 }
 
 /* CENTER */
 .center-panel {
-  border-right: 1px solid #1e1830;
+  position: relative;
 }
 
 .cal-scroll {
   height: 100%;
   overflow-y: auto;
-  position: relative;
 }
 
 .hour-row {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 40px 1fr;
   height: 60px;
-  border-bottom: 1px solid #181626;
-}
-
-.hour-label {
-  font-size: 10px;
-  text-align: right;
-  padding-right: 8px;
+  border-bottom: 1px solid #222;
 }
 
 .hour-slot {
-  border-left: 1px solid #181626;
+  border-left: 1px solid #222;
 }
 
-/* EVENTS */
 .events-layer {
   position: absolute;
   top: 0;
-  left: 44px;
+  left: 40px;
   right: 0;
 }
 
+/* EVENTS */
 .cal-event {
-  position: absolute;
-  left: 4px;
-  right: 4px;
+  background: #2a2050;
   border-radius: 6px;
-  padding: 6px;
+  padding: 5px;
   cursor: grab;
 }
-
-.cal-event:active {
-  cursor: grabbing;
-}
-
-/* COLORS */
-.ev-purple { background:#2a2050; color:#a78fff; }
-.ev-teal   { background:#0d2820; color:#5dcaa5; }
-.ev-pink   { background:#2a1020; color:#ed93b1; }
-.ev-gray   { background:#1a1828; color:#888780; }
 
 /* NOW LINE */
 .time-now-line {
   position: absolute;
-  left: 44px;
+  left: 40px;
   right: 0;
   height: 2px;
   background: #7f77dd;
 }
 
 .time-now-dot {
-  position: absolute;
-  left: -4px;
-  top: -3px;
   width: 8px;
   height: 8px;
   background: #7f77dd;
   border-radius: 50%;
+  position: absolute;
+  left: -4px;
+  top: -3px;
 }
 
 /* RIGHT */
-.right-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.sleep-section {
-  padding: 16px;
-  border-bottom: 1px solid #1e1830;
-}
-
 .chat-section {
-  flex: 1;
-  padding: 14px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
 }
 
 .chat-messages {
   flex: 1;
-  overflow-y: auto;
-  margin-bottom: 10px;
-}
-
-.msg {
-  font-size: 12px;
-  margin-bottom: 6px;
-}
-
-.msg-ai {
-  color: #c4b8e8;
-}
-
-.msg-user {
-  color: #a78fff;
-  text-align: right;
 }
 
 .chat-input-row {
   display: flex;
-  gap: 6px;
 }
 
 .chat-input {
   flex: 1;
-  padding: 6px;
-  background: #1a1828;
-  border: 1px solid #2a2440;
-  color: white;
 }
 
 .send-btn {
-  padding: 6px 10px;
-  background: #2a2050;
-  color: #a78fff;
-  border: none;
   cursor: pointer;
 }

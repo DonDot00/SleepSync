@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  DndContext,
-  useDraggable,
-  useDroppable
-} from "@dnd-kit/core";
+import { DndContext, useDraggable } from "@dnd-kit/core";
 import "./App.css";
 
 const HOUR_PX = 60;
@@ -18,8 +14,11 @@ function DraggableEvent({ ev }) {
   const style = {
     top: ev.startH * HOUR_PX,
     height: ev.durH * HOUR_PX,
+    position: "absolute",
+    left: 4,
+    right: 4,
     transform: transform
-      ? `translate(${transform.x}px, ${transform.y}px)`
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined
   };
 
@@ -36,30 +35,15 @@ function DraggableEvent({ ev }) {
   );
 }
 
-/* ---------- Droppable Grid ---------- */
-function DroppableGrid({ children }) {
-  const { setNodeRef } = useDroppable({ id: "calendar" });
-
-  return (
-    <div ref={setNodeRef} className="events-layer">
-      {children}
-    </div>
-  );
-}
-
 /* ---------- App ---------- */
 export default function App() {
   const [events, setEvents] = useState([
     { id:1, title:'Morning run', type:'teal', startH:7, durH:0.75 },
     { id:2, title:'Hackathon kickoff', type:'purple', startH:9, durH:3 },
     { id:3, title:'Lunch break', type:'gray', startH:12, durH:1 },
-    { id:4, title:'Build sprint', type:'purple', startH:13, durH:5 },
-    { id:5, title:'Team dinner', type:'pink', startH:19, durH:1.5 },
   ]);
 
-  const [messages, setMessages] = useState([
-    { type: "ai", text: "Hey! You have a big day ahead." }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
 
   const nowLineRef = useRef();
@@ -79,7 +63,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  /* ---------- Drag Logic ---------- */
+  /* ---------- Drag End ---------- */
   const handleDragEnd = (event) => {
     const { active, delta } = event;
 
@@ -88,10 +72,7 @@ export default function App() {
         if (ev.id === active.id) {
           let newStart = ev.startH + delta.y / HOUR_PX;
 
-          // snap to 15 min
-          newStart = Math.round(newStart * 4) / 4;
-
-          // clamp
+          newStart = Math.round(newStart * 4) / 4; // snap
           newStart = Math.max(0, Math.min(TOTAL_HOURS - ev.durH, newStart));
 
           return { ...ev, startH: newStart };
@@ -108,36 +89,24 @@ export default function App() {
     setMessages(prev => [
       ...prev,
       { type: "user", text: input },
-      { type: "ai", text: "Got it! I updated your schedule 👍" }
+      { type: "ai", text: "Updated 👍" }
     ]);
 
     setInput("");
-  };
-
-  const fmtHour = (h) => {
-    const hh = Math.floor(h) % 24;
-    const mm = Math.round((h - Math.floor(h)) * 60);
-    const ampm = hh < 12 ? "am" : "pm";
-    const disp = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
-    return mm === 0 ? `${disp}${ampm}` : `${disp}:${mm}${ampm}`;
   };
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
       <div className="app">
 
-        {/* TOP BAR */}
+        {/* TOP */}
         <div className="topbar">
           <span className="logo">SleepSync</span>
-          <span className="topbar-date">Saturday, April 12 2026</span>
-          <div className="topbar-score">
-            <span className="score-dot"></span>Sleep score: 74
-          </div>
         </div>
 
         <div className="main">
 
-          {/* LEFT PANEL */}
+          {/* LEFT */}
           <div className="left-panel">
             <div className="panel-title">April 2026</div>
             <div className="month-grid">
@@ -147,12 +116,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* CENTER PANEL */}
+          {/* CENTER */}
           <div className="center-panel">
-            <div className="center-header">
-              <span className="today-label">Today</span>
-            </div>
-
             <div className="cal-scroll">
               <div
                 className="hour-grid"
@@ -160,21 +125,19 @@ export default function App() {
               >
                 {Array.from({ length: 24 }, (_, h) => (
                   <div key={h} className="hour-row">
-                    <div className="hour-label">
-                      {h === 0 ? "" : `${h > 12 ? h - 12 : h}${h < 12 ? "am" : "pm"}`}
-                    </div>
+                    <div className="hour-label">{h}</div>
                     <div className="hour-slot"></div>
                   </div>
                 ))}
 
                 {/* EVENTS */}
-                <DroppableGrid>
+                <div className="events-layer">
                   {events.map(ev => (
                     <DraggableEvent key={ev.id} ev={ev} />
                   ))}
-                </DroppableGrid>
+                </div>
 
-                {/* CURRENT TIME */}
+                {/* NOW LINE */}
                 <div ref={nowLineRef} className="time-now-line">
                   <div className="time-now-dot"></div>
                 </div>
@@ -183,18 +146,9 @@ export default function App() {
             </div>
           </div>
 
-          {/* RIGHT PANEL */}
+          {/* RIGHT */}
           <div className="right-panel">
-
-            {/* Sleep */}
-            <div className="sleep-section">
-              <div className="panel-title">Sleep health</div>
-              <div className="sleep-meta-val">6h 40m</div>
-            </div>
-
-            {/* Chat */}
             <div className="chat-section">
-              <div className="panel-title">AI assistant</div>
 
               <div className="chat-messages">
                 {messages.map((m, i) => (
@@ -207,7 +161,6 @@ export default function App() {
               <div className="chat-input-row">
                 <input
                   className="chat-input"
-                  placeholder="Ask SleepSync..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMsg()}
@@ -216,9 +169,10 @@ export default function App() {
                   ↑
                 </button>
               </div>
-            </div>
 
+            </div>
           </div>
+
         </div>
       </div>
     </DndContext>
