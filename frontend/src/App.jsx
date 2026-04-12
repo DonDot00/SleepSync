@@ -7,6 +7,8 @@ const HOUR_PX     = 64;
 const TOTAL_HOURS = 24;
 const DAYS        = ["S","M","T","W","T","F","S"];
 const MONTHS      = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW         = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const todayDate   = new Date();
 
 const SLEEP_TIPS = [
   "Keep your wake-up time consistent, even on weekends.",
@@ -44,13 +46,11 @@ const EVENT_COLORS = [
 
 const PRIORITY_LABELS  = { high:"High", medium:"Medium", low:"Low" };
 const TASK_TYPE_LABELS = { fixed:"Fixed", flexible:"Flexible", free:"Free time" };
-const DOW              = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-const todayDate        = new Date();
 
-// ── API Layer ──
+// ── API Layer — all communication with the FastAPI backend ──
 const BASE = "http://localhost:8000";
 
-// converts backend snake_case to frontend camelCase
+// converts backend snake_case fields to frontend camelCase
 function toFrontend(task) {
   return {
     id:             task.id,
@@ -64,7 +64,7 @@ function toFrontend(task) {
     priority:       task.priority,
     taskType:       task.task_type,
     fixed_time:     task.fixed_time,
-    repeat:         task.repeat      || { enabled: false, days: [] },
+    repeat:         task.repeat      || { enabled: false, days: [], end_date: null },
     is_completed:   task.is_completed,
     is_missed:      task.is_missed,
     miss_count:     task.miss_count,
@@ -72,7 +72,7 @@ function toFrontend(task) {
   };
 }
 
-// converts frontend camelCase to backend snake_case
+// converts frontend camelCase fields to backend snake_case
 function toBackend(ev) {
   return {
     title:       ev.title,
@@ -85,16 +85,18 @@ function toBackend(ev) {
     priority:    ev.priority,
     task_type:   ev.taskType,
     fixed_time:  ev.fixed_time  || null,
-    repeat:      ev.repeat      || { enabled: false, days: [] },
+    repeat:      ev.repeat      || { enabled: false, days: [], end_date: null },
   };
 }
 
+// fetch all tasks — backend returns real rows including expanded repeats
 async function fetchTasks() {
   const res  = await fetch(`${BASE}/tasks/`);
   const data = await res.json();
   return data.map(toFrontend);
 }
 
+// create a new task — backend also expands repeats into separate rows
 async function createTask(ev) {
   const res  = await fetch(`${BASE}/tasks/`, {
     method:  "POST",
@@ -105,6 +107,7 @@ async function createTask(ev) {
   return toFrontend(data);
 }
 
+// patch a specific task — only fields included in changes get updated
 async function updateTask(id, changes) {
   const res  = await fetch(`${BASE}/tasks/${id}`, {
     method:  "PATCH",
@@ -115,10 +118,12 @@ async function updateTask(id, changes) {
   return toFrontend(data);
 }
 
+// delete a task by id
 async function deleteTask(id) {
   await fetch(`${BASE}/tasks/${id}`, { method: "DELETE" });
 }
 
+// send a chat message to the AI — includes energy and bedtime for full context
 async function sendChatMessage(message, wakeTime = "07:00", sleepTime = "23:00", energyLevel = 3) {
   const res = await fetch(`${BASE}/chat/`, {
     method:  "POST",
@@ -133,6 +138,7 @@ async function sendChatMessage(message, wakeTime = "07:00", sleepTime = "23:00",
   return await res.json();
 }
 
+// auto-save sleep data to the backend — non-blocking, won't break the UI if it fails
 async function saveSleepData(data) {
   try {
     await fetch(`${BASE}/sleep/`, {
@@ -140,19 +146,19 @@ async function saveSleepData(data) {
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(data),
     });
-  } catch { /* non-blocking */ }
+  } catch { /* intentionally silent */ }
 }
 
-// ── Fallback events if backend is unreachable ──
+// ── Fallback data shown if backend is unreachable ──
 const INITIAL_EVENTS = [
-  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, day:0, location:"Riverside Park",  description:"5K easy pace.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
-  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    day:0, location:"Room 4B",          description:"Team intro, sprint planning.", priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[] } },
-  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    day:0, location:"Cafeteria",        description:"Step away and recharge.",      priority:"low",    taskType:"free",     repeat:{ enabled:true,  days:[1,2,3,4,5] } },
-  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    day:0, location:"Room 4B",          description:"Core build time.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[] } },
-  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  day:0, location:"The Rustic Table", description:"Casual dinner.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
-  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  day:1, location:"Zoom",             description:"Daily team sync.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:true,  days:[1,2,3,4,5] } },
-  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    day:1, location:"Room 2A",          description:"Review final designs.",        priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[] } },
-  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    day:1, location:"Fitness Center",   description:"Strength session.",            priority:"medium", taskType:"flexible", repeat:{ enabled:true,  days:[1,3,5] } },
+  { id:1, title:"Morning run",       color:"teal",   startH:7,  durH:0.75, day:0, location:"Riverside Park",  description:"5K easy pace.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[], end_date:null } },
+  { id:2, title:"Hackathon kickoff", color:"purple", startH:9,  durH:3,    day:0, location:"Room 4B",          description:"Team intro, sprint planning.", priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[], end_date:null } },
+  { id:3, title:"Lunch break",       color:"gray",   startH:12, durH:1,    day:0, location:"Cafeteria",        description:"Step away and recharge.",      priority:"low",    taskType:"free",     repeat:{ enabled:true,  days:[1,2,3,4,5], end_date:null } },
+  { id:4, title:"Build sprint",      color:"purple", startH:13, durH:5,    day:0, location:"Room 4B",          description:"Core build time.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:false, days:[], end_date:null } },
+  { id:5, title:"Team dinner",       color:"pink",   startH:19, durH:1.5,  day:0, location:"The Rustic Table", description:"Casual dinner.",               priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[], end_date:null } },
+  { id:6, title:"Morning standup",   color:"blue",   startH:9,  durH:0.5,  day:1, location:"Zoom",             description:"Daily team sync.",             priority:"high",   taskType:"fixed",    repeat:{ enabled:true,  days:[1,2,3,4,5], end_date:null } },
+  { id:7, title:"Design review",     color:"amber",  startH:11, durH:2,    day:1, location:"Room 2A",          description:"Review final designs.",        priority:"medium", taskType:"flexible", repeat:{ enabled:false, days:[], end_date:null } },
+  { id:8, title:"Gym",               color:"teal",   startH:17, durH:1,    day:1, location:"Fitness Center",   description:"Strength session.",            priority:"medium", taskType:"flexible", repeat:{ enabled:true,  days:[1,3,5], end_date:null } },
 ];
 
 const INITIAL_MESSAGES = [
@@ -162,15 +168,29 @@ const INITIAL_MESSAGES = [
 ];
 
 // ── Helpers ──
-function makeDefaultRepeat() { return { enabled: false, days: [] }; }
+
+// default repeat object — includes end_date field
+function makeDefaultRepeat() { return { enabled: false, days: [], end_date: null }; }
+
+// format a decimal hour like 9.5 → "9:30am"
 function fmtH(h) {
   const hrs=Math.floor(h)%24, mins=Math.round((h%1)*60);
   const p=hrs>=12?"pm":"am", d=hrs%12===0?12:hrs%12;
   return mins===0?`${d}${p}`:`${d}:${String(mins).padStart(2,"0")}${p}`;
 }
-function snap(h)       { return Math.round(h*4)/4; }
-function hToInput(h)   { const hrs=Math.floor(h)%24,mins=Math.round((h%1)*60); return `${String(hrs).padStart(2,"0")}:${String(mins).padStart(2,"0")}`; }
+
+// snap a time to the nearest 15-minute increment
+function snap(h) { return Math.round(h*4)/4; }
+
+// convert decimal hour to HH:MM string for time inputs
+function hToInput(h) {
+  const hrs=Math.floor(h)%24, mins=Math.round((h%1)*60);
+  return `${String(hrs).padStart(2,"0")}:${String(mins).padStart(2,"0")}`;
+}
+
+// convert HH:MM string to decimal hour
 function inputToH(str) { if(!str) return 9; const [h,m]=str.split(":").map(Number); return h+m/60; }
+
 function randomTip()   { return SLEEP_TIPS[Math.floor(Math.random()*SLEEP_TIPS.length)]; }
 function getColor(id)  { return EVENT_COLORS.find(c=>c.id===id)||EVENT_COLORS[0]; }
 function calcSleepHours(bed,wake) { const b=inputToH(bed),w=inputToH(wake); return w>b?w-b:(24-b)+w; }
@@ -178,7 +198,7 @@ function estimateStages(h) { const m=h*60; return {light:Math.round(m*0.50),deep
 function fmtMins(m)    { const h=Math.floor(m/60),mn=m%60; return mn===0?`${h}h`:`${h}h ${mn}m`; }
 function dateToIso(d)  { return d.toISOString().split("T")[0]; }
 
-// get day offset (0=today, 1=tomorrow ...) from a Date object
+// get the number of days between a given Date and today (0=today, 1=tomorrow, etc.)
 function dateToDayOffset(date) {
   const today=new Date(); today.setHours(0,0,0,0);
   const sel=new Date(date); sel.setHours(0,0,0,0);
@@ -190,23 +210,23 @@ function offsetToDate(offset) {
   const d=new Date(); d.setDate(d.getDate()+offset); return d;
 }
 
-// human-readable label for a day column header
+// human-readable column header label for a given day offset
 function dayLabel(offset) {
   return offsetToDate(offset).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 }
 
+// convert an ISO date string to a day offset from today
 function isoToOffset(iso) {
-  const sel=new Date(iso+"T00:00:00");
-  const t=new Date(); t.setHours(0,0,0,0);
+  const sel=new Date(iso+"T00:00:00"), t=new Date(); t.setHours(0,0,0,0);
   return Math.max(0,Math.round((sel-t)/(1000*60*60*24)));
 }
 
-function offsetToIso(offset) {
-  const n=new Date(); n.setDate(n.getDate()+offset); return dateToIso(n);
-}
+// convert a day offset to an ISO date string
+function offsetToIso(offset) { return dateToIso(offsetToDate(offset)); }
 
+// derive a badge label from priority and task type
 function deriveBadge(priority, taskType) {
-  if(priority==="high" && taskType==="fixed") return "High priority · Fixed";
+  if(priority==="high"&&taskType==="fixed") return "High priority · Fixed";
   if(priority==="high")  return "High priority";
   if(taskType==="fixed") return "Fixed task";
   if(taskType==="free")  return "Free time";
@@ -222,7 +242,7 @@ function MoonIcon() {
   );
 }
 
-// ── Overlap layout ──
+// ── Overlap layout — prevents events from rendering on top of each other ──
 function layoutEvents(events) {
   if(!events.length) return [];
   const sorted=[...events].sort((a,b)=>a.startH-b.startH);
@@ -243,7 +263,7 @@ function layoutEvents(events) {
   });
 }
 
-// ── Repeat Picker ──
+// ── Repeat Picker — day-of-week selector + end date ──
 function RepeatPicker({ repeat, onChange }) {
   const toggle=(d)=>{
     const days=repeat.days.includes(d)
@@ -262,20 +282,116 @@ function RepeatPicker({ repeat, onChange }) {
         </label>
       </div>
       {repeat.enabled&&(
-        <div className="repeat-days">
-          {DOW.map((d,i)=>(
-            <button key={i} onClick={()=>toggle(i)}
-              className={`dow-btn${repeat.days.includes(i)?" active":""}`}>
-              {d}
-            </button>
-          ))}
-        </div>
+        <>
+          {/* day of week selector */}
+          <div className="repeat-days">
+            {DOW.map((d,i)=>(
+              <button key={i} onClick={()=>toggle(i)}
+                className={`dow-btn${repeat.days.includes(i)?" active":""}`}>
+                {d}
+              </button>
+            ))}
+          </div>
+          {/* end date — repeats stop after this date, defaults to 60 days if left blank */}
+          <div style={{marginTop:8}}>
+            <label className="modal-label">Repeat until</label>
+            <input className="modal-input" type="date"
+              value={repeat.end_date||""}
+              min={dateToIso(new Date())}
+              onChange={e=>onChange({...repeat,end_date:e.target.value||null})}
+              style={{colorScheme:"dark",marginTop:4}}/>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-// ── Event Modal ──
+// ── Shared modal body fields — used by both EventModal and AddEventModal ──
+function ModalFields({ form, set, endH, setEnd }) {
+  return (
+    <>
+      <label className="modal-label">Title</label>
+      <input className="modal-input" value={form.title}
+        onChange={e=>set("title",e.target.value)} placeholder="Event title..."/>
+
+      <label className="modal-label">Date</label>
+      <input className="modal-input" type="date"
+        value={offsetToIso(form.day)} min={dateToIso(new Date())}
+        onChange={e=>set("day",isoToOffset(e.target.value))}
+        style={{colorScheme:"dark"}}/>
+
+      <label className="modal-label">Location</label>
+      <input className="modal-input" value={form.location||""}
+        onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
+
+      <label className="modal-label">Description</label>
+      <textarea className="modal-textarea" value={form.description||""}
+        onChange={e=>set("description",e.target.value)}
+        placeholder="Add description..." rows={4}/>
+
+      <div className="modal-row">
+        <div className="modal-col">
+          <label className="modal-label">Start time</label>
+          <input className="modal-input" type="time" value={hToInput(form.startH)}
+            onChange={e=>set("startH",inputToH(e.target.value))}/>
+        </div>
+        <div className="modal-col">
+          <label className="modal-label">End time</label>
+          <input className="modal-input" type="time" value={hToInput(endH)}
+            onChange={e=>setEnd(e.target.value)}/>
+        </div>
+      </div>
+      <div className="modal-duration-hint">
+        Duration: {Math.floor(form.durH)}h {Math.round((form.durH%1)*60)>0?`${Math.round((form.durH%1)*60)}m`:""}
+      </div>
+
+      {/* priority pills */}
+      <div className="modal-row">
+        <div className="modal-col">
+          <label className="modal-label">Priority</label>
+          <div className="pill-group">
+            {["high","medium","low"].map(p=>(
+              <button key={p} onClick={()=>set("priority",p)}
+                className={`pill-btn${form.priority===p?" pill-active":""}`} data-priority={p}>
+                {PRIORITY_LABELS[p]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* task type pills */}
+        <div className="modal-col">
+          <label className="modal-label">Task type</label>
+          <div className="pill-group">
+            {["fixed","flexible","free"].map(t=>(
+              <button key={t} onClick={()=>set("taskType",t)}
+                className={`pill-btn${form.taskType===t?" pill-active":""}`}>
+                {TASK_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* repeat picker with end date */}
+      <RepeatPicker repeat={form.repeat} onChange={v=>set("repeat",v)}/>
+
+      {/* color swatches */}
+      <label className="modal-label">Color</label>
+      <div className="color-picker-row">
+        {EVENT_COLORS.map(c=>(
+          <button key={c.id} onClick={()=>set("color",c.id)}
+            className={`color-swatch${form.color===c.id?" selected":""}`}
+            style={{background:c.bg,borderColor:c.border}}>
+            {form.color===c.id&&<span className="color-swatch-check" style={{color:c.text}}>✓</span>}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── Event Modal — edit an existing event ──
 function EventModal({ ev, onClose, onSave, onDelete }) {
   const [form,setForm]=useState({
     ...ev,
@@ -287,6 +403,7 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
   const endH  =form.startH+form.durH;
   const setEnd=(val)=>{const e=inputToH(val);setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)}));};
   const cd    =getColor(form.color);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
@@ -295,63 +412,7 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <label className="modal-label">Title</label>
-          <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)}/>
-          <label className="modal-label">Date</label>
-          <input className="modal-input" type="date"
-            value={offsetToIso(form.day)} min={dateToIso(new Date())}
-            onChange={e=>set("day",isoToOffset(e.target.value))} style={{colorScheme:"dark"}}/>
-          <label className="modal-label">Location</label>
-          <input className="modal-input" value={form.location||""} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
-          <label className="modal-label">Description</label>
-          <textarea className="modal-textarea" value={form.description||""} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={5}/>
-          <div className="modal-row">
-            <div className="modal-col">
-              <label className="modal-label">Start time</label>
-              <input className="modal-input" type="time" value={hToInput(form.startH)}
-                onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
-            </div>
-            <div className="modal-col">
-              <label className="modal-label">End time</label>
-              <input className="modal-input" type="time" value={hToInput(endH)} onChange={e=>setEnd(e.target.value)}/>
-            </div>
-          </div>
-          <div className="modal-duration-hint">Duration: {Math.floor(form.durH)}h {Math.round((form.durH%1)*60)>0?`${Math.round((form.durH%1)*60)}m`:""}</div>
-          <div className="modal-row">
-            <div className="modal-col">
-              <label className="modal-label">Priority</label>
-              <div className="pill-group">
-                {["high","medium","low"].map(p=>(
-                  <button key={p} onClick={()=>set("priority",p)}
-                    className={`pill-btn${form.priority===p?" pill-active":""}`} data-priority={p}>
-                    {PRIORITY_LABELS[p]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="modal-col">
-              <label className="modal-label">Task type</label>
-              <div className="pill-group">
-                {["fixed","flexible","free"].map(t=>(
-                  <button key={t} onClick={()=>set("taskType",t)}
-                    className={`pill-btn${form.taskType===t?" pill-active":""}`}>
-                    {TASK_TYPE_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <RepeatPicker repeat={form.repeat} onChange={v=>set("repeat",v)}/>
-          <label className="modal-label">Color</label>
-          <div className="color-picker-row">
-            {EVENT_COLORS.map(c=>(
-              <button key={c.id} onClick={()=>set("color",c.id)}
-                className={`color-swatch${form.color===c.id?" selected":""}`}
-                style={{background:c.bg,borderColor:c.border}}>
-                {form.color===c.id&&<span className="color-swatch-check" style={{color:c.text}}>✓</span>}
-              </button>
-            ))}
-          </div>
+          <ModalFields form={form} set={set} endH={endH} setEnd={setEnd}/>
         </div>
         <div className="modal-footer">
           <button className="modal-btn-delete" onClick={()=>onDelete(ev.id)}>Delete</button>
@@ -362,7 +423,7 @@ function EventModal({ ev, onClose, onSave, onDelete }) {
   );
 }
 
-// ── Add Event Modal ──
+// ── Add Event Modal — create a new event ──
 function AddEventModal({ onClose, onAdd, defaultDayOffset=0 }) {
   const [form,setForm]=useState({
     title:"", color:"purple", startH:9, durH:1,
@@ -372,6 +433,7 @@ function AddEventModal({ onClose, onAdd, defaultDayOffset=0 }) {
   const set   =(k,v)=>setForm(f=>({...f,[k]:v}));
   const endH  =form.startH+form.durH;
   const setEnd=(val)=>{const e=inputToH(val);setForm(f=>({...f,durH:Math.max(0.25,e-f.startH)}));};
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
@@ -380,63 +442,7 @@ function AddEventModal({ onClose, onAdd, defaultDayOffset=0 }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <label className="modal-label">Title</label>
-          <input className="modal-input" value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Event title..." autoFocus/>
-          <label className="modal-label">Date</label>
-          <input className="modal-input" type="date"
-            value={offsetToIso(form.day)} min={dateToIso(new Date())}
-            onChange={e=>set("day",isoToOffset(e.target.value))} style={{colorScheme:"dark"}}/>
-          <label className="modal-label">Location</label>
-          <input className="modal-input" value={form.location} onChange={e=>set("location",e.target.value)} placeholder="Add location..."/>
-          <label className="modal-label">Description</label>
-          <textarea className="modal-textarea" value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Add description..." rows={5}/>
-          <div className="modal-row">
-            <div className="modal-col">
-              <label className="modal-label">Start time</label>
-              <input className="modal-input" type="time" value={hToInput(form.startH)}
-                onChange={e=>setForm(f=>({...f,startH:inputToH(e.target.value)}))}/>
-            </div>
-            <div className="modal-col">
-              <label className="modal-label">End time</label>
-              <input className="modal-input" type="time" value={hToInput(endH)} onChange={e=>setEnd(e.target.value)}/>
-            </div>
-          </div>
-          <div className="modal-duration-hint">Duration: {Math.floor(form.durH)}h {Math.round((form.durH%1)*60)>0?`${Math.round((form.durH%1)*60)}m`:""}</div>
-          <div className="modal-row">
-            <div className="modal-col">
-              <label className="modal-label">Priority</label>
-              <div className="pill-group">
-                {["high","medium","low"].map(p=>(
-                  <button key={p} onClick={()=>set("priority",p)}
-                    className={`pill-btn${form.priority===p?" pill-active":""}`} data-priority={p}>
-                    {PRIORITY_LABELS[p]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="modal-col">
-              <label className="modal-label">Task type</label>
-              <div className="pill-group">
-                {["fixed","flexible","free"].map(t=>(
-                  <button key={t} onClick={()=>set("taskType",t)}
-                    className={`pill-btn${form.taskType===t?" pill-active":""}`}>
-                    {TASK_TYPE_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <RepeatPicker repeat={form.repeat} onChange={v=>set("repeat",v)}/>
-          <label className="modal-label">Color</label>
-          <div className="color-picker-row">
-            {EVENT_COLORS.map(c=>(
-              <button key={c.id} onClick={()=>set("color",c.id)}
-                className={`color-swatch${form.color===c.id?" selected":""}`}
-                style={{background:c.bg,borderColor:c.border}}>
-                {form.color===c.id&&<span className="color-swatch-check" style={{color:c.text}}>✓</span>}
-              </button>
-            ))}
-          </div>
+          <ModalFields form={form} set={set} endH={endH} setEnd={setEnd}/>
         </div>
         <div className="modal-footer">
           <button className="modal-btn-delete" onClick={onClose}>Cancel</button>
@@ -458,19 +464,20 @@ function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent, bedtimeH }) {
   const widthPct   =totalCols>1?`calc(${100/totalCols}% - ${GAP}px)`:"calc(100% - 4px)";
   const leftOffset =totalCols>1?`calc(${(colIndex/totalCols)*100}% + ${colIndex*(GAP/totalCols)}px)`:"2px";
   const heightPx   =Math.max(ev.durH*HOUR_PX-3,26);
-  const isCompact  =heightPx<48;
+  const isCompact  =heightPx<48; // hide time and badge on very short blocks
   const badge      =deriveBadge(ev.priority,ev.taskType);
   const evEnd      =ev.startH+ev.durH;
   const showWindown=bedtimeH>0&&ev.startH<bedtimeH&&evEnd>bedtimeH;
+
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className="cal-event"
       style={{
-        top:ev.startH*HOUR_PX,height:heightPx,
-        width:widthPct,left:leftOffset,
+        top:ev.startH*HOUR_PX, height:heightPx,
+        width:widthPct, left:leftOffset,
         transform:transform?`translate3d(${transform.x}px,${transform.y}px,0)`:undefined,
-        opacity:dimmed?0.3:1,zIndex:isDragging?50:colIndex+2,
+        opacity:dimmed?0.3:1, zIndex:isDragging?50:colIndex+2,
         cursor:isDragging?"grabbing":"pointer",
-        background:c.bg,borderLeft:`2px solid ${c.border}`,color:c.text,
+        background:c.bg, borderLeft:`2px solid ${c.border}`, color:c.text,
         borderTop:"1px solid rgba(255,255,255,0.06)",
       }}
       onClick={()=>{if(!transform)onClickEvent(ev);}}>
@@ -482,6 +489,7 @@ function DayEvent({ ev, colIndex, totalCols, dimmed, onClickEvent, bedtimeH }) {
   );
 }
 
+// ghost shown while dragging
 function DragGhost({ ev }) {
   const c=getColor(ev.color);
   return (
@@ -494,7 +502,7 @@ function DragGhost({ ev }) {
   );
 }
 
-// ── Mini Calendar — clicking a date drives the center panel ──
+// ── Mini Calendar — clicking a date drives the center panel columns ──
 function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
   const now        =new Date();
   const [viewYear, setViewYear] =useState(now.getFullYear());
@@ -504,7 +512,13 @@ function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
   const isCurrent  =viewYear===now.getFullYear()&&viewMonth===now.getMonth();
   const prevMonth  =()=>viewMonth===0?(setViewMonth(11),setViewYear(y=>y-1)):setViewMonth(m=>m-1);
   const nextMonth  =()=>viewMonth===11?(setViewMonth(0),setViewYear(y=>y+1)):setViewMonth(m=>m+1);
-  const isSelected =(d)=>selectedDate.getFullYear()===viewYear&&selectedDate.getMonth()===viewMonth&&selectedDate.getDate()===d;
+
+  // check if a calendar day matches the currently selected date
+  const isSelected =(d)=>
+    selectedDate.getFullYear()===viewYear&&
+    selectedDate.getMonth()===viewMonth&&
+    selectedDate.getDate()===d;
+
   return (
     <div>
       <div className="cal-nav">
@@ -514,14 +528,15 @@ function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
         <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         <button className="cal-nav-btn" onClick={()=>setViewYear(y=>y+1)}>»</button>
       </div>
+
       <div className="month-grid">
         {DAYS.map((d,i)=><div key={i} className="day-label">{d}</div>)}
         <div className="day-label-underline"/>
         {Array.from({length:firstDow}).map((_,i)=><div key={`b${i}`} className="day-cell empty"/>)}
         {Array.from({length:daysInMonth},(_,i)=>i+1).map(d=>{
-          const isToday  =isCurrent&&d===now.getDate();
-          const isSel    =isSelected(d);
-          const hasEvent =isCurrent&&eventDays.includes(d);
+          const isToday =isCurrent&&d===now.getDate();
+          const isSel   =isSelected(d);
+          const hasEvent=isCurrent&&eventDays.includes(d);
           return (
             <div key={d}
               onClick={()=>onSelectDate(new Date(viewYear,viewMonth,d))}
@@ -532,12 +547,14 @@ function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
           );
         })}
       </div>
+
       <div className="mini-legend">
         <div className="legend-item"><span className="legend-dot purple"/>Work / deadline</div>
         <div className="legend-item"><span className="legend-dot teal"/>Exercise</div>
         <div className="legend-item"><span className="legend-dot pink"/>Personal</div>
         <div className="legend-item"><span className="legend-dot gray"/>Rest day</div>
       </div>
+
       <div className="weekly-stats">
         <div className="panel-title" style={{marginTop:14}}>This week</div>
         <div className="stat-row"><span className="stat-label">Avg sleep</span><span className="stat-val">6h 52m</span></div>
@@ -561,7 +578,7 @@ function MonthCalendar({ selectedDate, onSelectDate, eventDays }) {
   );
 }
 
-// ── Energy Slider ──
+// ── Energy Slider — 1=Exhausted to 5=Peak ──
 function EnergySlider({ value, onChange }) {
   const labels=["Exhausted","Low","Moderate","Good","Peak"];
   const colors=["#ef4444","#f97316","#eab308","#84cc16","#22c55e"];
@@ -576,7 +593,7 @@ function EnergySlider({ value, onChange }) {
   );
 }
 
-// ── Sleep Tip ──
+// ── Sleep Tip card ──
 function SleepTip({ tip, onDismiss, onDontShow }) {
   return (
     <div className="tip-card">
@@ -592,24 +609,26 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-// ── Sleep Health — auto-saves to backend, notifies parent of bedtime changes ──
+// ── Sleep Health panel — auto-saves to backend, bubbles bedtime to parent ──
 function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChange }) {
   const [bedtime,   setBedtime]   = useState("23:00");
   const [waketime,  setWaketime]  = useState("06:40");
   const [goalHours, setGoalHours] = useState(8);
+
   const totalHours = calcSleepHours(bedtime,waketime);
   const stages     = estimateStages(totalHours);
   const totalMin   = Math.round(totalHours*60);
   const score      = Math.min(100,Math.round((totalHours/goalHours)*100));
-  const r=34,circ=2*Math.PI*r,offset=circ-(score/100)*circ;
+  const r=34, circ=2*Math.PI*r, offset=circ-(score/100)*circ;
   const avgDiff    = Math.round((totalHours-6.47)*60);
-  const stageDefs  = [
+
+  const stageDefs = [
     {label:"Deep",  mins:stages.deep,  color:"#4338ca"},
     {label:"REM",   mins:stages.rem,   color:"#7c3aed"},
     {label:"Light", mins:stages.light, color:"#3b82f6"},
   ];
 
-  // auto-save sleep data and bubble bedtime up to parent whenever values change
+  // auto-save sleep data and bubble bedtime up whenever any value changes
   useEffect(()=>{
     onBedtimeChange&&onBedtimeChange(bedtime);
     saveSleepData({
@@ -627,6 +646,8 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChang
   return (
     <div className="sleep-section">
       <div className="panel-title">Sleep health</div>
+
+      {/* sleep score ring */}
       <div className="sleep-ring-row">
         <div className="ring-wrap" style={{width:80,height:80}}>
           <svg width="80" height="80" viewBox="0 0 80 80" style={{transform:"rotate(-90deg)"}}>
@@ -641,6 +662,8 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChang
           <div className="sleep-meta-label">Last night</div>
         </div>
       </div>
+
+      {/* Deep / REM / Light stage bars */}
       <div className="sleep-bars">
         {stageDefs.map(b=>(
           <div key={b.label} className="bar-row">
@@ -652,13 +675,17 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChang
           </div>
         ))}
       </div>
+
+      {/* editable bedtime, wake time, and sleep goal chips */}
       <div className="sleep-chips">
         <div className="sleep-chip sleep-chip-editable">
-          <input className="sleep-time-chip-input" type="time" value={bedtime} onChange={e=>setBedtime(e.target.value)}/>
+          <input className="sleep-time-chip-input" type="time" value={bedtime}
+            onChange={e=>setBedtime(e.target.value)}/>
           <div className="sleep-chip-label">Bedtime</div>
         </div>
         <div className="sleep-chip sleep-chip-editable">
-          <input className="sleep-time-chip-input" type="time" value={waketime} onChange={e=>setWaketime(e.target.value)}/>
+          <input className="sleep-time-chip-input" type="time" value={waketime}
+            onChange={e=>setWaketime(e.target.value)}/>
           <div className="sleep-chip-label">Wake</div>
         </div>
         <div className="sleep-chip sleep-chip-editable" style={{alignItems:"center",textAlign:"center"}}>
@@ -677,37 +704,40 @@ function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChang
           <div className="sleep-chip-label">vs avg · 3× restless</div>
         </div>
       </div>
+
       {showTip&&<SleepTip tip={tip} onDismiss={onDismissTip} onDontShow={onDontShowTip}/>}
     </div>
   );
 }
 
-// ── AI Chat — sends energy + bedtime context to backend ──
+// ── AI Chat — sends energy + bedtime to backend, handles AI-created events ──
 function AIChat({ energy, bedtime, onEventCreated }) {
   const [messages,setMessages]=useState(INITIAL_MESSAGES);
   const [input,   setInput]   =useState("");
   const [loading, setLoading] =useState(false);
   const endRef=useRef();
+
+  // auto-scroll to latest message
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
 
-  const send=async()=>{
-    const txt=input.trim();
-    if(!txt||loading) return;
-    setMessages(p=>[...p,{from:"user",text:txt}]);
+  const send = async () => {
+    const txt = input.trim();
+    if(!txt || loading) return;
+    setMessages(p => [...p, { from:"user", text:txt }]);
     setInput("");
     setLoading(true);
     try {
-      const res=await sendChatMessage(txt,"07:00",bedtime,energy);
-      setMessages(p=>[...p,{from:"ai",text:res.message}]);
+      const res = await sendChatMessage(txt, "07:00", bedtime, energy);
+      console.log("AI response:", res); // ← add it right here
+      setMessages(p => [...p, { from:"ai", text:res.message }]);
       if(res.warning){
-        setMessages(p=>[...p,{from:"ai",text:`⚠️ ${res.warning}`}]);
+        setMessages(p => [...p, { from:"ai", text:`⚠️ ${res.warning}`}]);
       }
-      // if AI created a task in the backend, refresh events in the parent
-      if(res.action==="add_task"&&res.created_task_id){
-        onEventCreated&&onEventCreated();
+      if(res.action === "add_task" && res.created_task_id){
+        onEventCreated && onEventCreated();
       }
     } catch {
-      setMessages(p=>[...p,{from:"ai",text:"I'm having trouble connecting right now. Try again in a moment."}]);
+      setMessages(p=>[...p,{from:"ai",text:"I'm having trouble connecting right now."}]);
     } finally {
       setLoading(false);
     }
@@ -717,7 +747,9 @@ function AIChat({ energy, bedtime, onEventCreated }) {
     <div className="chat-section">
       <div className="panel-title">AI assistant</div>
       <div className="chat-messages">
-        {messages.map((m,i)=><div key={i} className={`msg msg-${m.from}`}>{m.text}</div>)}
+        {messages.map((m,i)=>(
+          <div key={i} className={`msg msg-${m.from}`}>{m.text}</div>
+        ))}
         {loading&&<div className="msg msg-ai" style={{opacity:0.5}}>Thinking...</div>}
         <div ref={endRef}/>
       </div>
@@ -731,26 +763,33 @@ function AIChat({ energy, bedtime, onEventCreated }) {
   );
 }
 
-// ── Day Column ──
+// ── Day Column — renders hour lines, events, bedtime line, and now indicator ──
 function DayColumn({ dayOffset, events, activeId, onClickEvent, bedtimeH, nowRef }) {
   const laid=useMemo(()=>layoutEvents(events),[events]);
   return (
     <div className="day-col-wrap" style={{height:TOTAL_HOURS*HOUR_PX,position:"relative"}}>
+      {/* hour and half-hour background lines */}
       {Array.from({length:TOTAL_HOURS},(_,h)=>(
         <div key={h} style={{position:"absolute",top:h*HOUR_PX,left:0,right:0,pointerEvents:"none"}}>
           <div className="hour-bg-line"/>
           <div className="half-bg-line"/>
         </div>
       ))}
+
+      {/* render all events with overlap layout applied */}
       {laid.map(({ev,colIndex,totalCols})=>(
         <DayEvent key={ev.id} ev={ev} colIndex={colIndex} totalCols={totalCols}
           dimmed={ev.id===activeId} onClickEvent={onClickEvent} bedtimeH={bedtimeH}/>
       ))}
+
+      {/* dashed bedtime line */}
       {bedtimeH>0&&(
         <div className="bedtime-line" style={{top:bedtimeH*HOUR_PX}}>
           <span className="bedtime-line-label">{fmtH(bedtimeH)} bedtime</span>
         </div>
       )}
+
+      {/* live "now" indicator — only shown on today's column */}
       {dayOffset===0&&nowRef&&(
         <div ref={nowRef} className="now-line" style={{position:"absolute",left:0,right:0}}>
           <div className="now-dot"/>
@@ -762,17 +801,17 @@ function DayColumn({ dayOffset, events, activeId, onClickEvent, bedtimeH, nowRef
 
 // ── Root App ──
 export default function App() {
-  const [events,       setEvents]       = useState([]);
-  const [activeId,     setActiveId]     = useState(null);
-  const [modalEv,      setModalEv]      = useState(null);
-  const [showAdd,      setShowAdd]      = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());  // drives both calendar and columns
-  const [energy,       setEnergy]       = useState(3);
-  const [showEnWarn,   setShowEnWarn]   = useState(true);
+  const [events,       setEvents]       = useState([]);           // loaded from backend on mount
+  const [activeId,     setActiveId]     = useState(null);         // id of event being dragged
+  const [modalEv,      setModalEv]      = useState(null);         // event open in edit modal
+  const [showAdd,      setShowAdd]      = useState(false);        // controls add event modal
+  const [selectedDate, setSelectedDate] = useState(new Date());   // drives which day columns show
+  const [energy,       setEnergy]       = useState(3);            // 1-5 energy level
+  const [showEnWarn,   setShowEnWarn]   = useState(true);         // low energy banner
   const [tip]                           = useState(()=>randomTip());
   const [showTip,      setShowTip]      = useState(true);
-  const [bedtime,      setBedtime]      = useState("23:00");     // shared between header + sleep panel + AI
-  const [numDays,      setNumDays]      = useState(2);
+  const [bedtime,      setBedtime]      = useState("23:00");      // shared across header, AI, sleep panel
+  const [numDays,      setNumDays]      = useState(2);            // 1 or 2 columns based on screen width
 
   const scrollRef = useRef();
   const nowRef    = useRef();
@@ -781,25 +820,23 @@ export default function App() {
   const sensors   = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}));
   const bedtimeH  = inputToH(bedtime);
 
-  // day offset of the currently selected calendar date (0=today, 1=tomorrow, etc.)
+  // day offset of the currently selected calendar date
   const selectedOffset = dateToDayOffset(selectedDate);
 
   // which calendar days have events — used for dot indicators on mini calendar
-  const eventDays = [...new Set(
-    events.map(ev=>offsetToDate(ev.day).getDate())
-  )];
+  const eventDays = [...new Set(events.map(ev=>offsetToDate(ev.day).getDate()))];
 
-  // load tasks from backend on mount
+  // load all tasks from backend on mount — fall back to hardcoded if backend is down
   useEffect(()=>{
     fetchTasks().then(setEvents).catch(()=>setEvents(INITIAL_EVENTS));
   },[]);
 
-  // called by AIChat when the AI creates a task — re-fetches the full list
+  // re-fetch all tasks — called when AI creates an event so calendar updates immediately
   const refreshEvents = useCallback(()=>{
     fetchTasks().then(setEvents).catch(()=>{});
   },[]);
 
-  // responsive column count based on center panel width
+  // watch center panel width and switch between 1 and 2 day columns
   useEffect(()=>{
     if(!centerRef.current) return;
     const ro=new ResizeObserver(entries=>{
@@ -809,7 +846,7 @@ export default function App() {
     return()=>ro.disconnect();
   },[]);
 
-  // scroll to current hour on load
+  // scroll calendar to current time on first load
   useEffect(()=>{
     if(scrollRef.current){
       const h=todayDate.getHours()+todayDate.getMinutes()/60;
@@ -817,7 +854,7 @@ export default function App() {
     }
   },[]);
 
-  // tick the "now" line every minute
+  // update the now line position every minute
   useEffect(()=>{
     const update=()=>{
       const d=new Date(),h=d.getHours()+d.getMinutes()/60;
@@ -828,10 +865,12 @@ export default function App() {
     return()=>clearInterval(t);
   },[]);
 
+  // re-show energy warning whenever the slider moves
   useEffect(()=>{setShowEnWarn(true);},[energy]);
 
   const onDragStart=({active})=>setActiveId(active.id);
 
+  // on drag end — optimistically update UI then sync new startH to backend
   const onDragEnd=async({active,delta})=>{
     setActiveId(null);
     const ev=events.find(e=>e.id===active.id);
@@ -842,6 +881,7 @@ export default function App() {
     try { await updateTask(ev.id,{start_h:s}); } catch {}
   };
 
+  // save edits from EventModal — syncs all changed fields to backend
   const handleSave=async(u)=>{
     try {
       const saved=await updateTask(u.id,{
@@ -857,22 +897,25 @@ export default function App() {
     setModalEv(null);
   };
 
+  // delete task from backend then remove from local state
   const handleDelete=async(id)=>{
     try { await deleteTask(id); } catch {}
     setEvents(p=>p.filter(ev=>ev.id!==id));
     setModalEv(null);
   };
 
+  // create task in backend — backend also expands repeat rows — then refresh
   const handleAdd=async(nev)=>{
     try {
-      const saved=await createTask(nev);
-      setEvents(p=>[...p,saved]);
+      await createTask(nev);
+      // refresh full list so expanded repeat copies appear on the calendar
+      refreshEvents();
     } catch {
       setEvents(p=>[...p,{...nev,id:Date.now()}]);
     }
   };
 
-  // first column = selected date, second column = the day after
+  // first column = selected date, second = the day after
   const dayCols=numDays===2
     ?[
         {offset:selectedOffset,   evs:events.filter(e=>e.day===selectedOffset)},
@@ -886,6 +929,7 @@ export default function App() {
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="app">
 
+        {/* ── Topbar ── */}
         <div className="topbar">
           <span className="logo">SleepSync</span>
           <span className="topbar-date">
@@ -896,6 +940,7 @@ export default function App() {
 
         <div className="main">
 
+          {/* ── Left panel — mini calendar + weekly stats ── */}
           <div className="panel left-panel">
             <MonthCalendar
               selectedDate={selectedDate}
@@ -904,9 +949,11 @@ export default function App() {
             />
           </div>
 
+          {/* ── Center panel — calendar grid ── */}
           <div className="center-panel" ref={centerRef}>
             <div className="today-header">
               <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
+                {/* header label updates when a non-today date is selected */}
                 <span className="today-label">
                   {selectedOffset===0
                     ?"Today"
@@ -922,8 +969,10 @@ export default function App() {
               <button className="add-event-btn" onClick={()=>setShowAdd(true)}>+ Add event</button>
             </div>
 
+            {/* energy slider — passed to AI so it adjusts schedule density */}
             <EnergySlider value={energy} onChange={setEnergy}/>
 
+            {/* low energy warning banner */}
             {energy<=2&&showEnWarn&&(
               <div className="energy-warning">
                 <span>Low energy today — I'll suggest lighter tasks and extra breaks.</span>
@@ -931,8 +980,11 @@ export default function App() {
               </div>
             )}
 
+            {/* scrollable calendar grid */}
             <div className="cal-scroll-area" ref={scrollRef}>
               <div className="cal-grid-inner">
+
+                {/* hour labels on the left */}
                 <div className="hour-labels-col">
                   {Array.from({length:TOTAL_HOURS},(_,h)=>(
                     <div key={h} className="hour-label-row" style={{height:HOUR_PX}}>
@@ -940,6 +992,8 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+
+                {/* day columns — first is selected date, second is next day */}
                 <div className="day-cols-flex">
                   <div className="day-headers-row">
                     {dayCols.map((col,i)=>(
@@ -970,6 +1024,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── Right panel — sleep health + AI chat ── */}
           <div className="right-panel">
             <SleepHealth
               showTip={showTip} tip={tip}
@@ -977,20 +1032,27 @@ export default function App() {
               onDontShowTip={()=>setShowTip(false)}
               onBedtimeChange={setBedtime}
             />
-            <AIChat energy={energy} bedtime={bedtime} onEventCreated={refreshEvents}/>
+            <AIChat
+              energy={energy}
+              bedtime={bedtime}
+              onEventCreated={refreshEvents}
+            />
           </div>
         </div>
       </div>
 
+      {/* drag ghost overlay */}
       <DragOverlay dropAnimation={null}>
         {activeEv?<DragGhost ev={activeEv}/>:null}
       </DragOverlay>
 
+      {/* edit event modal */}
       {modalEv&&(
         <EventModal ev={modalEv} onClose={()=>setModalEv(null)}
           onSave={handleSave} onDelete={handleDelete}/>
       )}
 
+      {/* add event modal — defaults to currently selected day */}
       {showAdd&&(
         <AddEventModal onClose={()=>setShowAdd(false)}
           onAdd={handleAdd} defaultDayOffset={selectedOffset}/>
