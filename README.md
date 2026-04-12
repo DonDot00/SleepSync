@@ -59,17 +59,16 @@ SleepSync is built around three principles from sleep research:
 
 ## Features
 
-- 🤖 **AI assistant** — Chat naturally to plan your day, reschedule events, and get personalized sleep advice.
-- 😴 **Sleep optimization** — Suggests ideal bedtimes and wake times based on your workload and personal goals.
-- 🗓 **Smart scheduling** — AI places flexible tasks in optimal time slots based on your energy and sleep patterns.
-- ⚡ **Real-time adjustments** — Adapts your schedule on the fly when things change.
-- 📊 **Sleep health panel** — Tracks Deep, REM, and Light sleep with estimated stage breakdowns.
-- 🔁 **Repeating events** — Set recurring tasks (e.g. class MWF at 9am) and the scheduler accounts for them automatically.
-- 🌙 **Bedtime line** — A visible bedtime line on your calendar warns you when events conflict with your wind-down window.
-- ⚡ **Energy slider** — Tell SleepSync how you feel today and it adjusts your schedule accordingly.
-- 🎨 **Custom event colors** — Color-code events by type with 8 theme options.
-- 📅 **Dual-day view** — See today and tomorrow side by side, collapsing to one column on smaller screens.
-- 🔴 **Priority tracking** — High / Medium / Low priority with automatic demotion after repeated misses.
+- 🤖 **AI Assistant** — Chat naturally to plan your day, reschedule events, and get personalized sleep advice.
+- 😴 **Sleep Optimization** — Suggests ideal bedtimes and wake times based on your workload and personal goals.
+- 🗓 **Smart Scheduling** — AI places flexible tasks in optimal time slots based on your energy and sleep patterns.
+- ⚡ **Real-time Adjustments** — Adapts your schedule on the fly when things change.
+- 📊 **Sleep Health Panel** — Tracks Deep, REM, and Light sleep using estimated stage breakdowns.
+- 🔁 **Repeating Events** — Set recurring tasks (e.g. class MWF at 9am) and the scheduler accounts for them automatically.
+- 🌙 **Bedtime Line** — A visible bedtime line on your calendar warns you when events conflict with your set wind-down window.
+- ⚡ **Energy Slider** — Tell SleepSync how you feel today and it adjusts your schedule accordingly.
+- 📅 **Dual-day View** — See today and tomorrow side by side, collapsing to one column on smaller screens.
+- 🔴 **Priority Tracking** — High / Medium / Low priority with automatic demotion after repeated misses.
 
 ---
 
@@ -127,7 +126,7 @@ Frontend displays AI message + optionally refreshes calendar
 | Frontend   | React, Vite, Node.js    | Fast dev server, component-based UI       |
 | Styling    | Plain CSS + Rubik/Syne  | Custom dark theme, no framework overhead  |
 | Backend    | Python + FastAPI        | Fast, typed, auto-generates API docs      |
-| Database   | SQLite + SQLAlchemy     | Zero config for hackathon, easy to swap   |
+| Database   | SQLite + SQLAlchemy     | No required configuration, easy to swap   |
 | AI         | OpenAI GPT-4o-mini      | Fast, cheap, structured JSON output       |
 | Drag/Drop  | @dnd-kit/core           | Modern React drag-and-drop                |
 
@@ -245,3 +244,5 @@ This hackathon project covers the core scheduling loop. Here is where SleepSync 
 |------------------|---------------------|
 | Donovan Raymond  | Back End Developer  |
 | Rasheed Mustapha | Front End Developer |
+
+- [SleepSync](#SleepSync)
