@@ -1,145 +1,225 @@
-import { useState, useEffect } from "react"
+import { useState } from "react";
+import "./App.css";
 
-const BASE = "http://localhost:8000"
+// Font: Outfit (body) + Syne (headings/accents)
 
-const api = {
-  getTasks: () => fetch(`${BASE}/tasks/`).then(r => r.json()),
-  createTask: (task) => fetch(`${BASE}/tasks/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(task)
-  }).then(r => r.json()),
-  updateTask: (id, update) => fetch(`${BASE}/tasks/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(update)
-  }).then(r => r.json()),
-  getSchedule: (wake, sleep) =>
-    fetch(`${BASE}/schedule/generate?wake_time=${wake}&sleep_time=${sleep}`).then(r => r.json())
-}
+const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const EVENTS_THIS_MONTH = [3, 7, 9, 11, 14, 17, 20, 23];
 
-const PRIORITY_COLORS = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" }
-const TYPE_COLORS = { fixed: "#5b5ef4", flexible: "#22c55e", free: "#facc15", sleep: "#60a5fa" }
+const TODAY_EVENTS = [
+  { time: "7:00am", duration: "7:00 – 7:45am", title: "Morning run", type: "teal", badge: null },
+  { time: "9:00am", duration: "9:00am – 12:00pm", title: "Hackathon kickoff", type: "purple", badge: "High focus window" },
+  { time: "12:00pm", duration: "12:00 – 1:00pm", title: "Lunch break", type: "gray", badge: null },
+  { time: "1:00pm", duration: "1:00 – 6:00pm", title: "Build sprint", type: "purple", badge: "Wind down by 10pm" },
+  { time: "7:00pm", duration: "7:00 – 8:30pm", title: "Team dinner", type: "pink", badge: null },
+];
 
-export default function App() {
-  const [schedule, setSchedule] = useState([])
-  const [wake, setWake] = useState("07:00")
-  const [sleep, setSleep] = useState("23:00")
-  const [form, setForm] = useState({
-    name: "", duration_minutes: 30,
-    priority: "medium", task_type: "flexible", fixed_time: ""
-  })
+// iunitial chat messages to show some context and examples of how the assistant can help with scheduling and sleep recommendations. These can be adjusted or expanded as needed.
+const INITIAL_MESSAGES = [
+  { from: "ai", text: "Hey! You have a big day ahead. I've protected your wind-down window — aim to wrap up by 10pm tonight." },
+  { from: "user", text: "Can you move my run to 6am?" },
+  { from: "ai", text: "Done! I've shifted the run to 6:00–6:45am. That gives you more focus time before kickoff." },
+];
 
-  const refresh = async () => {
-    const s = await api.getSchedule(wake, sleep)
-    setSchedule(s.schedule || [])
-  }
-
-  useEffect(() => { refresh() }, [])
-
-  const addTask = async () => {
-    if (!form.name) return
-    await api.createTask(form)
-    setForm({ name: "", duration_minutes: 30, priority: "medium", task_type: "flexible", fixed_time: "" })
-    refresh()
-  }
-
-  const mark = async (id, type) => {
-    if (!id) return
-    await api.updateTask(id, { [type]: true })
-    refresh()
-  }
+function MonthCalendar() {
+  const [selected, setSelected] = useState(12);
+  const blanks = 2;
+  const days = Array.from({ length: 30 }, (_, i) => i + 1);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f0f13", color: "#f0f0f0", fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      <div style={{ maxWidth: 700, margin: "0 auto" }}>
-
-        <h1 style={{ fontSize: "2.5rem", fontWeight: 800, marginBottom: "0.25rem" }}>REM AI</h1>
-        <p style={{ color: "#666", marginBottom: "2rem" }}>Your intelligent daily scheduler</p>
-
-        {/* Wake/Sleep */}
-        <div style={{ background: "#1a1a24", borderRadius: 12, padding: "1rem", marginBottom: "1.5rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "#888" }}>
-            WAKE UP
-            <input type="time" value={wake} onChange={e => setWake(e.target.value)}
-              style={{ background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.4rem", color: "#f0f0f0" }} />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.8rem", color: "#888" }}>
-            SLEEP
-            <input type="time" value={sleep} onChange={e => setSleep(e.target.value)}
-              style={{ background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.4rem", color: "#f0f0f0" }} />
-          </label>
-          <button onClick={refresh}
-            style={{ marginTop: "1rem", background: "#5b5ef4", border: "none", borderRadius: 8, padding: "0.5rem 1.25rem", color: "#fff", cursor: "pointer", fontWeight: 600 }}>
-            Generate Schedule
-          </button>
-        </div>
-
-        {/* Add Task */}
-        <div style={{ background: "#1a1a24", borderRadius: 12, padding: "1rem", marginBottom: "1.5rem" }}>
-          <p style={{ fontSize: "0.8rem", color: "#888", marginBottom: "0.75rem" }}>ADD TASK</p>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <input placeholder="Task name" value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
-              onKeyDown={e => e.key === "Enter" && addTask()}
-              style={{ flex: 2, minWidth: 150, background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.5rem", color: "#f0f0f0" }} />
-            <input type="number" placeholder="Min" value={form.duration_minutes}
-              onChange={e => setForm({ ...form, duration_minutes: parseInt(e.target.value) })}
-              style={{ width: 70, background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.5rem", color: "#f0f0f0" }} />
-            <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
-              style={{ background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.5rem", color: "#f0f0f0" }}>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            <select value={form.task_type} onChange={e => setForm({ ...form, task_type: e.target.value })}
-              style={{ background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.5rem", color: "#f0f0f0" }}>
-              <option value="flexible">Flexible</option>
-              <option value="fixed">Fixed Time</option>
-              <option value="free">Free Time</option>
-            </select>
-            {form.task_type === "fixed" && (
-              <input type="time" value={form.fixed_time}
-                onChange={e => setForm({ ...form, fixed_time: e.target.value })}
-                style={{ background: "#0f0f13", border: "1px solid #333", borderRadius: 6, padding: "0.5rem", color: "#f0f0f0" }} />
-            )}
-            <button onClick={addTask}
-              style={{ background: "#5b5ef4", border: "none", borderRadius: 8, padding: "0.5rem 1.25rem", color: "#fff", cursor: "pointer", fontWeight: 600 }}>
-              + Add
-            </button>
+    <div className="panel left-panel">
+      <div className="panel-title">April 2026</div>
+      <div className="month-grid">
+        {DAYS.map((d, i) => (
+          <div key={i} className="day-label">{d}</div>
+        ))}
+        {Array.from({ length: blanks }).map((_, i) => (
+          <div key={`blank-${i}`} className="day-cell empty" />
+        ))}
+        {days.map((d) => (
+          <div
+            key={d}
+            className={`day-cell ${d === selected ? "today" : ""} ${EVENTS_THIS_MONTH.includes(d) ? "has-event" : ""}`}
+            onClick={() => setSelected(d)}
+          >
+            {d}
           </div>
+        ))}
+      </div>
+      <div className="mini-legend">
+        <div className="legend-item"><span className="legend-dot purple" />Work / deadline</div>
+        <div className="legend-item"><span className="legend-dot teal" />Exercise</div>
+        <div className="legend-item"><span className="legend-dot pink" />Personal</div>
+        <div className="legend-item"><span className="legend-dot gray" />Rest day</div>
+      </div>
+      <div className="weekly-stats">
+        <div className="panel-title" style={{marginTop: "14px"}}>This week</div>
+        <div className="stat-row">
+          <span className="stat-label">Avg sleep</span>
+          <span className="stat-val">6h 52m</span>
         </div>
-
-        {/* Schedule */}
-        <div>
-          <p style={{ fontSize: "0.8rem", color: "#888", marginBottom: "0.75rem" }}>TODAY'S SCHEDULE</p>
-          {schedule.length === 0 && (
-            <div style={{ color: "#444", textAlign: "center", padding: "2rem" }}>Add tasks and hit Generate Schedule</div>
-          )}
-          {schedule.map((block, i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: "1rem",
-              padding: "0.875rem 1rem", borderRadius: 10, marginBottom: "0.5rem",
-              background: "#1a1a24", borderLeft: `4px solid ${TYPE_COLORS[block.type] || "#333"}`
-            }}>
-              <span style={{ fontSize: "0.75rem", color: "#666", minWidth: 110 }}>{block.start} – {block.end}</span>
-              <span style={{ flex: 1, fontWeight: 500 }}>{block.name}</span>
-              {block.priority !== "non-negotiable" && (
-                <span style={{ fontSize: "0.7rem", color: PRIORITY_COLORS[block.priority], textTransform: "uppercase" }}>{block.priority}</span>
-              )}
-              {block.task_id && (
-                <div style={{ display: "flex", gap: "0.4rem" }}>
-                  <button onClick={() => mark(block.task_id, "is_completed")}
-                    style={{ background: "transparent", border: "1px solid #333", borderRadius: 6, padding: "0.2rem 0.5rem", cursor: "pointer", fontSize: "1rem" }}>✅</button>
-                  <button onClick={() => mark(block.task_id, "is_missed")}
-                    style={{ background: "transparent", border: "1px solid #333", borderRadius: 6, padding: "0.2rem 0.5rem", cursor: "pointer", fontSize: "1rem" }}>❌</button>
+        <div className="stat-row">
+          <span className="stat-label">Best night</span>
+          <span className="stat-val">8h 10m</span>
+        </div>
+        <div className="stat-row">
+          <span className="stat-label">Goal hit</span>
+          <span className="stat-val purple">3 / 7</span>
+        </div>
+        <div className="week-bar-row">
+          {["M","T","W","T","F","S","S"].map((d, i) => {
+            const heights = [65, 80, 50, 90, 70, 45, 75];
+            const isGoal = heights[i] >= 75;
+            return (
+              <div key={i} className="week-bar-wrap">
+                <div className="week-bar-track">
+                  <div className="week-bar-fill" style={{height: `${heights[i]}%`, background: isGoal ? "#7f77dd" : "#2a2050"}} />
                 </div>
-              )}
-            </div>
-          ))}
+                <span className="week-bar-label">{d}</span>
+              </div>
+            );
+          })}
         </div>
-
       </div>
     </div>
-  )
+  );
+}
+
+function TodaySchedule() {
+  return (
+    <div className="center-panel">
+      <div className="today-header">
+        <span className="today-label">Today</span>
+        <span className="today-sub">4 events · Bedtime by 11:00pm</span>
+      </div>
+      <div className="timeline">
+        {TODAY_EVENTS.map((ev, i) => (
+          <div key={i} className="time-row">
+            <div className="time-label">{ev.time.replace(":00", "").replace("am","am").replace("pm","pm")}</div>
+            <div className={`event-block ev-${ev.type}`}>
+              <div className="event-title">{ev.title}</div>
+              <div className="event-time">{ev.duration}</div>
+              {ev.badge && <div className="sleep-badge">{ev.badge}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AIChat() {
+  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [input, setInput] = useState("");
+
+  const send = () => {
+    const txt = input.trim();
+    if (!txt) return;
+    setMessages((prev) => [...prev, { from: "user", text: txt }]);
+    setInput("");
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { from: "ai", text: "Got it! I'll factor that into your schedule and adjust your sleep recommendations." },
+      ]);
+    }, 600);
+  };
+
+  return (
+    <div className="chat-section">
+      <div className="panel-title">AI assistant</div>
+      <div className="chat-messages">
+        {messages.map((m, i) => (
+          <div key={i} className={`msg msg-${m.from}`}>{m.text}</div>
+        ))}
+      </div>
+      <div className="chat-input-row">
+        <input
+          className="chat-input"
+          placeholder="Ask SleepSync..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+        />
+        <button className="send-btn" onClick={send}>↑</button>
+      </div>
+    </div>
+  );
+}
+
+function SleepHealth() {
+  const score = 74;
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+
+  return (
+    <div className="sleep-section">
+      <div className="panel-title">Sleep health</div>
+      <div className="sleep-ring-row">
+        <div className="ring-wrap">
+          <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="28" cy="28" r={radius} fill="none" stroke="#1e1830" strokeWidth="5" />
+            <circle
+              cx="28" cy="28" r={radius}
+              fill="none" stroke="#7f77dd" strokeWidth="5"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="ring-center">{score}</div>
+        </div>
+        <div className="sleep-meta">
+          <div className="sleep-meta-val">6h 40m</div>
+          <div className="sleep-meta-label">Last night</div>
+          <div className="sleep-meta-label goal">Goal: 8h</div>
+        </div>
+      </div>
+      <div className="sleep-bars">
+        {[
+          { label: "Deep", pct: 55, color: "#534ab7", val: "1h 50m" },
+          { label: "REM", pct: 40, color: "#7f77dd", val: "1h 20m" },
+          { label: "Light", pct: 70, color: "#3c3489", val: "3h 30m" },
+        ].map((b) => (
+          <div key={b.label} className="bar-row">
+            <span className="bar-label">{b.label}</span>
+            <div className="bar-track">
+              <div className="bar-fill" style={{ width: `${b.pct}%`, background: b.color }} />
+            </div>
+            <span className="bar-val">{b.val}</span>
+          </div>
+        ))}
+      </div>
+      <div className="suggestion">
+        <div className="suggestion-label">Suggestion</div>
+        <div className="suggestion-text">
+          You slept 1h 20m less than your goal. Consider a 20min nap between 2–3pm to recover focus.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <div className="topbar">
+        <span className="logo">SleepSync</span>
+        <span className="topbar-date">Saturday, April 12 2026</span>
+        <div className="topbar-score">
+          <span className="score-dot" />
+          Sleep score: 74
+        </div>
+      </div>
+      <div className="main">
+        <MonthCalendar />
+        <TodaySchedule />
+        <div className="right-panel">
+          <AIChat />
+          <SleepHealth />
+        </div>
+      </div>
+    </div>
+  );
 }
