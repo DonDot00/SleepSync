@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models.task import Task
-from app.services.scheduler import generate_schedule
+from app.db_setup import get_db
+from app.models.task_model import Task
+from app.services.schedule_engine import generate_schedule
 
 router = APIRouter()
 
