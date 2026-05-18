@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import date, timedelta
+import uuid
 from app.db_setup import get_db
 from app.models.task_model import Task
 from app.schemas.task_schemas import TaskCreate, TaskUpdate, TaskOut
@@ -11,100 +12,104 @@ router = APIRouter()
 
 def expand_repeats(base_task: Task, repeat_config: dict, db: Session):
     """
-    After a task is saved, create real database rows for every repeat occurrence
-    between tomorrow and the repeat end_date. Each copy is a standalone row
-    that does not repeat further, preventing infinite expansion.
+    Create copies of base_task on every matching weekday between tomorrow and end_date.
+    All copies share base_task.repeat_group_id so the series can be cancelled later.
+    The base task itself is day-0 of the series; copies start from day+1.
     """
-    if not repeat_config.get("enabled"):
-        return
-    if not repeat_config.get("days"):
+    if not repeat_config.get("enabled") or not repeat_config.get("days"):
         return
 
-    today        = date.today()
-    end_date_str = repeat_config.get("end_date")
+    today    = date.today()
+    end_str  = repeat_config.get("end_date")
+    end_date = date.fromisoformat(end_str) if end_str else today + timedelta(days=60)
 
-    # default to 60 days out if no end date was provided
-    end_date = date.fromisoformat(end_date_str) if end_date_str else today + timedelta(days=60)
+    # Start from the day after the base task
+    base_date = today + timedelta(days=int(base_task.day))
+    current   = base_date + timedelta(days=1)
 
-    repeat_days = repeat_config["days"]  # list of ints [0=Sun, 1=Mon ... 6=Sat]
+    group_id = base_task.repeat_group_id or str(uuid.uuid4())
+    # Ensure the base task also carries the group id
+    if not base_task.repeat_group_id:
+        base_task.repeat_group_id = group_id
+        db.add(base_task)
 
-    # walk every day from tomorrow to the end date
-    current = today + timedelta(days=1)
     while current <= end_date:
-        # Python weekday() gives Mon=0..Sun=6
-        # convert to Sun=0..Sat=6 to match the frontend DOW array
-        dow = (current.weekday() + 1) % 7
-
-        if dow in repeat_days:
-            offset = (current - today).days  # integer days from today
-            copy = Task(
-                title       = base_task.title,
-                color       = base_task.color,
-                start_h     = base_task.start_h,
-                dur_h       = base_task.dur_h,
-                day         = offset,
-                location    = base_task.location,
-                description = base_task.description,
-                priority    = base_task.priority,
-                task_type   = base_task.task_type,
-                fixed_time  = base_task.fixed_time,
-                repeat      = {"enabled": False, "days": [], "end_date": None},
-            )
-            db.add(copy)
-
+        dow = (current.weekday() + 1) % 7  # 0=Sun … 6=Sat, matching JS convention
+        if dow in repeat_config["days"]:
+            db.add(Task(
+                title           = base_task.title,
+                color           = base_task.color,
+                start_h         = base_task.start_h,
+                dur_h           = base_task.dur_h,
+                day             = (current - today).days,
+                location        = base_task.location,
+                description     = base_task.description,
+                priority        = base_task.priority,
+                task_type       = base_task.task_type,
+                fixed_time      = base_task.fixed_time,
+                repeat          = {"enabled": False, "days": [], "end_date": None},
+                repeat_group_id = group_id,
+            ))
         current += timedelta(days=1)
 
     db.commit()
 
 
 def safe_day(task, today):
-    """
-    Defensively converts the day field to an integer offset.
-    Handles cases where day might be stored as a date string or None.
-    Returns 0 (today) as a fallback if conversion fails.
-    """
+    if isinstance(task.day, int):
+        return task.day
     try:
-        if task.day is None:
-            return 0
-        return int(task.day)
-    except (ValueError, TypeError):
+        return (date.fromisoformat(str(task.day)) - today).days
+    except Exception:
         return 0
 
 
-# POST /tasks/ — create a new task from the AddEventModal form
+# ── CRUD ──────────────────────────────────────────────────────────────────────
+
 @router.post("/", response_model=TaskOut)
 def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     data = task.model_dump()
     data["repeat"] = task.repeat.model_dump()
+    data["day"]    = int(data["day"])
+
     db_task = Task(**data)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
-    # expand repeat occurrences into their own rows
+
     expand_repeats(db_task, data["repeat"], db)
+    db.refresh(db_task)
     return db_task
 
 
-# GET /tasks/ — fetch all tasks so the calendar can display them
 @router.get("/", response_model=List[TaskOut])
 def get_tasks(db: Session = Depends(get_db)):
+    tasks = db.query(Task).all()
+    today = date.today()
+    dirty = False
+    for task in tasks:
+        if not isinstance(task.day, int):
+            task.day = safe_day(task, today)
+            db.add(task)
+            dirty = True
+    if dirty:
+        db.commit()
     return db.query(Task).all()
 
 
-# PATCH /tasks/{task_id} — update any field, or mark complete/missed
 @router.patch("/{task_id}", response_model=TaskOut)
 def update_task(task_id: int, update: TaskUpdate, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    update_data = update.model_dump(exclude_none=True)
-    for key, value in update_data.items():
+    for key, value in update.model_dump(exclude_none=True).items():
         if key == "repeat" and hasattr(value, "model_dump"):
             value = value.model_dump()
+        if key == "day":
+            value = int(value) if isinstance(value, int) else 0
         setattr(task, key, value)
 
-    # miss streak logic — demote priority after 3 consecutive misses
     if update.is_missed:
         task.miss_count += 1
         if task.miss_count >= 3 and task.priority == "high":
@@ -120,7 +125,6 @@ def update_task(task_id: int, update: TaskUpdate, db: Session = Depends(get_db))
     return task
 
 
-# DELETE /tasks/{task_id} — remove a task when user deletes it in the modal
 @router.delete("/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -129,3 +133,36 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     db.delete(task)
     db.commit()
     return {"detail": "deleted"}
+
+
+# ── Recurring series cancellation ─────────────────────────────────────────────
+
+@router.delete("/group/{group_id}")
+def cancel_recurring_series(
+    group_id: str,
+    from_day: int = 0,          # delete this occurrence + all future ones (day offset)
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel all occurrences of a recurring series on or after `from_day`.
+
+    - from_day=0  → deletes the entire series (all days)
+    - from_day=3  → keeps occurrences on days 0–2, deletes day 3 onwards
+
+    The frontend should pass the day offset of the occurrence the user
+    clicked "Cancel this and future events" on.
+    """
+    tasks_to_delete = (
+        db.query(Task)
+        .filter(Task.repeat_group_id == group_id, Task.day >= from_day)
+        .all()
+    )
+    if not tasks_to_delete:
+        raise HTTPException(status_code=404, detail="No matching recurring tasks found")
+
+    for t in tasks_to_delete:
+        db.delete(t)
+    db.commit()
+    return {"detail": f"Deleted {len(tasks_to_delete)} occurrence(s) from day {from_day} onwards"}
+
+    
