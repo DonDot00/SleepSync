@@ -27,27 +27,27 @@ function MoonIcon() {
 }
 
 export default function App() {
-  const [events,       setEvents]       = useState([]);
-  const [activeId,     setActiveId]     = useState(null);
-  const [modalEv,      setModalEv]      = useState(null);
-  const [showAdd,      setShowAdd]      = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [energy,       setEnergy]       = useState(3);
-  const [showEnWarn,   setShowEnWarn]   = useState(true);
-  const [tip]                           = useState(() => randomTip());
-  const [showTip,      setShowTip]      = useState(true);
-  const [bedtime,      setBedtime]      = useState("23:00");
-  const [numDays,      setNumDays]      = useState(2);
+  const [events,       setEvents]       = useState([]); // all events loaded from backend
+  const [activeId,     setActiveId]     = useState(null); // id of event currently being dragged
+  const [modalEv,      setModalEv]      = useState(null); // event being edited in the modal — null if no modal open
+  const [showAdd,      setShowAdd]      = useState(false); // whether the add event modal is open
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Which date is selected on the mini calendar
+  const [energy,       setEnergy]       = useState(3); // 1-5 slider of how energetic user feels today
+  const [showEnWarn,   setShowEnWarn]   = useState(true); // show energy warning on first load
+  const [tip]                           = useState(() => randomTip()); // pick a random tip on load and stick to it
+  const [showTip,      setShowTip]      = useState(true); // show AI tip on first load
+  const [bedtime,      setBedtime]      = useState("23:00"); // default bedtime — can be changed by user or AI suggestions
+  const [numDays,      setNumDays]      = useState(2); // Whether to show 1 or 2 day columns
 
-  const scrollRef  = useRef();
-  const centerRef  = useRef();
-  const activeEv   = events.find(e => e.id === activeId);
-  const sensors    = useSensors(useSensor(PointerSensor, { activationConstraint:{ distance:8 } }));
-  const bedtimeH   = inputToH(bedtime);
-  const nowRef     = useNowLine(scrollRef);
+  const scrollRef  = useRef(); // !!!
+  const centerRef  = useRef(); // !!!
+  const activeEv   = events.find(e => e.id === activeId); // !!!event currently being dragged
+  const sensors    = useSensors(useSensor(PointerSensor, { activationConstraint:{ distance:8 } })); // drag sensors
+  const bedtimeH   = inputToH(bedtime); // bedtime in hours, e.g. 23.5 for 11:30pm
+  const nowRef     = useNowLine(scrollRef); // current time in hours, updated every minute by useNowLine hook
 
-  const selectedOffset = dateToDayOffset(selectedDate);
-  const eventDays      = [...new Set(events.map(ev => offsetToDate(ev.day).getDate()))];
+  const selectedOffset = dateToDayOffset(selectedDate); // how many days the selected date is from today — 0=today, 1=tomorrow, -1=yesterday, etc.
+  const eventDays      = [...new Set(events.map(ev => offsetToDate(ev.day).getDate()))]; // unique days that have events
 
   // load all tasks from backend on mount — fall back to hardcoded if backend is down
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function App() {
 
   const onDragStart = ({ active }) => setActiveId(active.id);
 
-  // on drag end — optimistically update UI then sync new startH to backend
+  // !!! on drag end — optimistically update UI then sync new startH to backend
   const onDragEnd = async ({ active, delta }) => {
     setActiveId(null);
     const ev = events.find(e => e.id === active.id);
@@ -85,7 +85,7 @@ export default function App() {
     try { await updateTask(ev.id, { start_h:s }); } catch {}
   };
 
-  // save edits from EventModal — syncs all changed fields to backend
+  // !!! save edits from EventModal — syncs all changed fields to backend
   const handleSave = async (u) => {
     try {
       const saved = await updateTask(u.id, {
@@ -101,14 +101,14 @@ export default function App() {
     setModalEv(null);
   };
 
-  // delete a single task
+  // !!! delete a single task
   const handleDelete = async (id) => {
     try { await deleteTask(id); } catch {}
     setEvents(p => p.filter(ev => ev.id !== id));
     setModalEv(null);
   };
 
-  // cancel a recurring series — cancelAll=true removes all, false removes this + future
+  // !!! cancel a recurring series — cancelAll=true removes all, false removes this + future
   const handleCancelRecurring = async (ev, cancelAll) => {
     if (!ev.repeatGroupId) { handleDelete(ev.id); return; }
     const fromDay = cancelAll ? 0 : ev.day;
@@ -116,7 +116,7 @@ export default function App() {
     refreshEvents();
   };
 
-  // create task in backend — backend expands repeat rows — then refresh so copies appear
+  // !!! create task in backend — backend expands repeat rows — then refresh so copies appear
   const handleAdd = async (nev) => {
     try {
       await createTask(nev);
@@ -126,7 +126,7 @@ export default function App() {
     }
   };
 
-  // first column = selected date, second = the day after
+  // !!! first column = selected date, second = the day after
   const dayCols = numDays === 2
     ? [
         { offset:selectedOffset,     evs:events.filter(e => e.day === selectedOffset) },
@@ -136,6 +136,7 @@ export default function App() {
 
   const sleepScore = Math.min(100, Math.round((calcSleepHours(bedtime, "06:40") / 8) * 100));
 
+  // main render. Think of a wireframe or html.
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="app">

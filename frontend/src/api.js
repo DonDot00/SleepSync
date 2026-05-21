@@ -1,7 +1,7 @@
 const BASE = "http://localhost:8000";
 
 // ── Translators ──
-
+// changes backend variables to frontend ones
 export function toFrontend(task) {
   return {
     id:             task.id,
@@ -23,7 +23,7 @@ export function toFrontend(task) {
     complete_count: task.complete_count,
   };
 }
-
+// changes frontend variables to backend ones
 export function toBackend(ev) {
   return {
     title:       ev.title,
@@ -41,13 +41,13 @@ export function toBackend(ev) {
 }
 
 // ── Task CRUD ──
-
+// !!!
 export async function fetchTasks() {
   const res  = await fetch(`${BASE}/tasks/`);
   const data = await res.json();
   return data.map(toFrontend);
 }
-
+// !!!
 export async function createTask(ev) {
   const res  = await fetch(`${BASE}/tasks/`, {
     method:  "POST",
@@ -57,7 +57,7 @@ export async function createTask(ev) {
   const data = await res.json();
   return toFrontend(data);
 }
-
+// !!!
 export async function updateTask(id, changes) {
   const res  = await fetch(`${BASE}/tasks/${id}`, {
     method:  "PATCH",
@@ -67,7 +67,7 @@ export async function updateTask(id, changes) {
   const data = await res.json();
   return toFrontend(data);
 }
-
+// !!!
 export async function deleteTask(id) {
   await fetch(`${BASE}/tasks/${id}`, { method:"DELETE" });
 }
