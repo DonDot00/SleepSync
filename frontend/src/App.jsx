@@ -36,7 +36,8 @@ export default function App() {
   const [showEnWarn,   setShowEnWarn]   = useState(true); // show energy warning on first load
   const [tip]                           = useState(() => randomTip()); // pick a random tip on load and stick to it
   const [showTip,      setShowTip]      = useState(true); // show AI tip on first load
-  const [bedtime,      setBedtime]      = useState("23:00"); // default bedtime — can be changed by user or AI suggestions
+  const [bedtime,      setBedtime]      = useState("23:00");
+  const [waketime,     setWaketime]     = useState("06:40");
   const [numDays,      setNumDays]      = useState(2); // Whether to show 1 or 2 day columns
 
   const scrollRef  = useRef(); // !!!
@@ -243,10 +244,13 @@ export default function App() {
               onDontShowTip={() => setShowTip(false)}
               bedtime={bedtime}
               onBedtimeChange={setBedtime}
+              waketime={waketime}
+              onWaketimeChange={setWaketime}
             />
             <AIChat
               energy={energy}
               bedtime={bedtime}
+              waketime={waketime}
               onEventCreated={refreshEvents}
             />
           </div>

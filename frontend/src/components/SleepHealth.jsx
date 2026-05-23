@@ -15,8 +15,7 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, bedtime, onBedtimeChange }) {
-  const [waketime,  setWaketime]  = useState("06:40");
+export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, bedtime, onBedtimeChange, waketime, onWaketimeChange }) {
   const [goalHours, setGoalHours] = useState(8);
 
   const totalHours = calcSleepHours(bedtime, waketime);
@@ -91,7 +90,7 @@ export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip,
         </div>
         <div className="sleep-chip sleep-chip-editable">
           <input className="sleep-time-chip-input" type="time" value={waketime}
-            onChange={e => setWaketime(e.target.value)}/>
+            onChange={e => onWaketimeChange(e.target.value)}/>
           <div className="sleep-chip-label">Wake</div>
         </div>
         <div className="sleep-chip sleep-chip-editable" style={{ alignItems:"center", textAlign:"center" }}>

@@ -1,5 +1,10 @@
 const BASE = "http://localhost:8000";
 
+async function checked(res) {
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
 // ── Translators ──
 // changes backend variables to frontend ones
 export function toFrontend(task) {
@@ -44,7 +49,7 @@ export function toBackend(ev) {
 // !!!
 export async function fetchTasks() {
   const res  = await fetch(`${BASE}/tasks/`);
-  const data = await res.json();
+  const data = await checked(res);
   return data.map(toFrontend);
 }
 // !!!
@@ -54,7 +59,7 @@ export async function createTask(ev) {
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(toBackend(ev)),
   });
-  const data = await res.json();
+  const data = await checked(res);
   return toFrontend(data);
 }
 // !!!
@@ -64,7 +69,7 @@ export async function updateTask(id, changes) {
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(changes),
   });
-  const data = await res.json();
+  const data = await checked(res);
   return toFrontend(data);
 }
 // !!!
@@ -91,7 +96,7 @@ export async function sendChatMessage(message, wakeTime="07:00", sleepTime="23:0
       energy_level: energyLevel,
     }),
   });
-  return await res.json();
+  return await checked(res);
 }
 
 // ── Sleep ──

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { sendChatMessage } from "../api";
 import { INITIAL_MESSAGES } from "../constants";
 
-export default function AIChat({ energy, bedtime, onEventCreated }) {
+export default function AIChat({ energy, bedtime, waketime, onEventCreated }) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input,    setInput]    = useState("");
   const [loading,  setLoading]  = useState(false);
@@ -18,7 +18,7 @@ export default function AIChat({ energy, bedtime, onEventCreated }) {
     setInput("");
     setLoading(true);
     try {
-      const res = await sendChatMessage(txt, "07:00", bedtime, energy);
+      const res = await sendChatMessage(txt, waketime, bedtime, energy);
       setMessages(p => [...p, { from:"ai", text:res.message }]);
       if (res.warning) {
         setMessages(p => [...p, { from:"ai", text:`⚠️ ${res.warning}` }]);
