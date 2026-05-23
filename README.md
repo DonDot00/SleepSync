@@ -5,6 +5,7 @@
 ---
 
 ## Table of Contents
+- [Quick Start](#quick-start)
 - [About](#about)
 - [Why SleepSync?](#why-sleepsync)
 - [Features](#features)
@@ -12,6 +13,44 @@
 - [Tech Stack](#tech-stack)
 - [Roadmap](#roadmap)
 - [Team](#team)
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+| Tool | Minimum version | Download |
+|---|---|---|
+| Python | 3.11 | https://python.org/downloads — check "Add to PATH" |
+| Node.js | 18 | https://nodejs.org |
+| OpenAI API key | — | https://platform.openai.com/api-keys |
+
+### Install
+
+```
+git clone https://github.com/YOUR_USERNAME/REM.git
+cd REM
+python setup.py
+```
+
+The setup script creates the Python virtual environment, installs all packages, and prompts you for your OpenAI API key.
+
+### Run
+
+Double-click **`Start REM.vbs`**, then open **http://localhost:5173** in your browser.
+
+> Two terminal windows will open — one for the backend (port 8000) and one for the frontend (port 5173). Both need to stay open.
+
+### Apple Watch integration (optional)
+
+```
+python generate_shortcut.py
+```
+
+AirDrop the generated `SleepSync.shortcut` file to your iPhone and tap **Add Shortcut**. To automate it: Shortcuts app → Automation → When my alarm stops → Run Shortcut → SleepSync.
+
+> Re-run `generate_shortcut.py` if your PC's local IP address changes.
 
 ---
 
@@ -136,15 +175,15 @@ This hackathon project covers the core scheduling loop. Here is where SleepSync 
 
 ### Near term
 - [ ] User accounts and authentication.
-- [ ] Persistent sleep history applied across sessions.
-- [ ] Weekly comprehensive sleep report which data such as most missed tasks, goal hit rate, sleep stats. 
+- [x] Persistent sleep history applied across sessions.
+- [ ] Weekly comprehensive sleep report with data such as most missed tasks, goal hit rate, sleep stats.
 - [ ] Streak tracking (Duolingo-style) for consistent habits
 
 ### Medium term
 - [ ] Google Calendar and Outlook sync to pull existing events automatically and fit them into SleepSync.
-- [ ] Wearable integration using devices such as Fitbit, Oura Ring, Apple Health sleep data.
+- [x] Wearable integration — Apple Watch sleep data (deep, REM, light) via iOS Shortcuts.
 - [ ] Burnout detection which flags when sleep debt accumulates over multiple days.
-- [ ] Mood journal — one-word daily check-in, correlated with sleep score and possibly energey level over time.
+- [ ] Mood journal — one-word daily check-in, correlated with sleep score and energy level over time.
 
 ### Long term
 - [ ] Team scheduling to find shared availability with others without anyone sacrificing sleep.
