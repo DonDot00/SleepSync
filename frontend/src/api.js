@@ -101,6 +101,12 @@ export async function sendChatMessage(message, wakeTime="07:00", sleepTime="23:0
 
 // ── Sleep ──
 
+export async function fetchLatestSleep() {
+  const res  = await fetch(`${BASE}/sleep/recent`);
+  const data = await checked(res);
+  return data[0] || null;
+}
+
 export async function saveSleepData(data) {
   try {
     await fetch(`${BASE}/sleep/`, {

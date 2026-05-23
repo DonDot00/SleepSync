@@ -15,13 +15,19 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, bedtime, onBedtimeChange, waketime, onWaketimeChange }) {
+export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, bedtime, onBedtimeChange, waketime, onWaketimeChange, sleepRecord }) {
   const [goalHours, setGoalHours] = useState(8);
 
-  const totalHours = calcSleepHours(bedtime, waketime);
-  const stages     = estimateStages(totalHours);
+  // Use real Apple Watch data when available, otherwise estimate from the bedtime inputs
+  const hasWatch   = sleepRecord && sleepRecord.total_hours != null;
+  const totalHours = hasWatch ? sleepRecord.total_hours : calcSleepHours(bedtime, waketime);
+  const stages     = hasWatch
+    ? { deep: sleepRecord.deep_mins, rem: sleepRecord.rem_mins, light: sleepRecord.light_mins }
+    : estimateStages(totalHours);
   const totalMin   = Math.round(totalHours * 60);
-  const score      = Math.min(100, Math.round((totalHours / goalHours) * 100));
+  const score      = hasWatch
+    ? sleepRecord.score
+    : Math.min(100, Math.round((totalHours / goalHours) * 100));
   const avgDiff    = Math.round((totalHours - 6.47) * 60);
 
   const r     = 34;
@@ -64,7 +70,7 @@ export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip,
         </div>
         <div className="sleep-meta">
           <div className="sleep-meta-val" style={{ fontSize:22 }}>{fmtMins(totalMin)}</div>
-          <div className="sleep-meta-label">Last night</div>
+          <div className="sleep-meta-label">{hasWatch ? "Apple Watch · last night" : "Estimated · last night"}</div>
         </div>
       </div>
 

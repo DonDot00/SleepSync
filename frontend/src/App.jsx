@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import "./App.css";
 
-import { fetchTasks, createTask, updateTask, deleteTask, deleteRecurringGroup } from "./api";
+import { fetchTasks, createTask, updateTask, deleteTask, deleteRecurringGroup, fetchLatestSleep } from "./api";
 import { HOUR_PX, TOTAL_HOURS, INITIAL_EVENTS } from "./constants";
 import { snap, inputToH, calcSleepHours, dateToDayOffset, offsetToDate, dayLabel, randomTip, dateToIso } from "./utils";
 import { useNowLine } from "./hooks/useNowLine";
@@ -39,6 +39,7 @@ export default function App() {
   const [bedtime,      setBedtime]      = useState("23:00"); // user's usual bedtime — used to calculate sleep score and show in header
   const [waketime,     setWaketime]     = useState("06:40"); // user's usual wake time
   const [numDays,      setNumDays]      = useState(2); // Whether to show 1 or 2 day columns
+  const [sleepRecord,  setSleepRecord]  = useState(null); // most recent real sleep record from backend
 
   const scrollRef  = useRef(); // !!!
   const centerRef  = useRef(); // !!!
@@ -53,6 +54,7 @@ export default function App() {
   // load all tasks from backend on mount — fall back to hardcoded if backend is down
   useEffect(() => {
     fetchTasks().then(setEvents).catch(() => setEvents(INITIAL_EVENTS));
+    fetchLatestSleep().then(setSleepRecord).catch(() => {});
   }, []);
 
   // re-fetch all tasks — called after AI creates events or after any mutation that adds rows
@@ -244,6 +246,9 @@ export default function App() {
               onDontShowTip={() => setShowTip(false)}
               bedtime={bedtime}
               onBedtimeChange={setBedtime}
+              waketime={waketime}
+              onWaketimeChange={setWaketime}
+              sleepRecord={sleepRecord}
             />
             <AIChat
               energy={energy}

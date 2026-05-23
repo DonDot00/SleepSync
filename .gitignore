@@ -44,3 +44,6 @@ Thumbs.db
 *.log
 *.tmp
 .cache/
+
+# Generated files (contain local IP — regenerate with generate_shortcut.py)
+SleepSync.shortcut
