@@ -106,7 +106,7 @@ export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip,
           <div className="sleep-chip-val" style={{ color:avgDiff >= 0 ? "#84cc16" : "#f87171" }}>
             {avgDiff >= 0 ? "+" : ""}{avgDiff}m
           </div>
-          <div className="sleep-chip-label">vs avg · 3× restless</div>
+          <div className="sleep-chip-label">vs avg</div>
         </div>
       </div>
 

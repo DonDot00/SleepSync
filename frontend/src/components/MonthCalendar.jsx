@@ -56,25 +56,6 @@ export default function MonthCalendar({ selectedDate, onSelectDate, eventDays })
         <div className="legend-item"><span className="legend-dot gray"/>Rest day</div>
       </div>
 
-      <div className="weekly-stats">
-        <div className="panel-title" style={{ marginTop:14 }}>This week</div>
-        <div className="stat-row"><span className="stat-label">Avg sleep</span><span className="stat-val">6h 52m</span></div>
-        <div className="stat-row"><span className="stat-label">Best night</span><span className="stat-val">8h 10m</span></div>
-        <div className="stat-row"><span className="stat-label">Goal hit</span><span className="stat-val purple">3 / 7</span></div>
-        <div className="week-bar-row">
-          {["M","T","W","T","F","S","S"].map((d, i) => {
-            const h = [65,80,50,90,70,45,75][i];
-            return (
-              <div key={i} className="week-bar-wrap">
-                <div className="week-bar-track">
-                  <div className="week-bar-fill" style={{ height:`${h}%`, background:h>=75?"#7f77dd":"#2a2050" }}/>
-                </div>
-                <span className="week-bar-label">{d}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

@@ -53,7 +53,5 @@ export const INITIAL_EVENTS = [
 ];
 
 export const INITIAL_MESSAGES = [
-  { from:"ai",   text:"Hey! You have a big day ahead. I've protected your wind-down window — aim to wrap up by your bedtime tonight." },
-  { from:"user", text:"Can you move my run to 6am?" },
-  { from:"ai",   text:"Done! Shifted to 6:00–6:45am. That gives you more focus time before kickoff." },
+  { from:"ai", text:"Hey! I'm your SleepSync assistant. Ask me to add events, reschedule tasks, or get advice on your day." },
 ];
