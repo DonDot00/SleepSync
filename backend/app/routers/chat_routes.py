@@ -62,7 +62,6 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     }
 
     result = chat_with_ai(request.message, schedule_context)
-    print("AI result:", result)
 
     created_ids = []
 
@@ -95,7 +94,6 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 db.refresh(new_task)
 
             created_ids.append(new_task.id)
-            print(f"Task created — id={new_task.id}  repeat_group={group_id}")
 
     result["created_task_ids"] = created_ids
     return result
