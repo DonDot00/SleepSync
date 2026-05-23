@@ -4,7 +4,7 @@ import "./App.css";
 
 import { fetchTasks, createTask, updateTask, deleteTask, deleteRecurringGroup } from "./api";
 import { HOUR_PX, TOTAL_HOURS, INITIAL_EVENTS } from "./constants";
-import { snap, inputToH, calcSleepHours, dateToDayOffset, offsetToDate, dayLabel, randomTip } from "./utils";
+import { snap, inputToH, calcSleepHours, dateToDayOffset, offsetToDate, dayLabel, randomTip, dateToIso } from "./utils";
 import { useNowLine } from "./hooks/useNowLine";
 
 import MonthCalendar  from "./components/MonthCalendar";
@@ -47,7 +47,7 @@ export default function App() {
   const nowRef     = useNowLine(scrollRef); // current time in hours, updated every minute by useNowLine hook
 
   const selectedOffset = dateToDayOffset(selectedDate); // how many days the selected date is from today — 0=today, 1=tomorrow, -1=yesterday, etc.
-  const eventDays      = [...new Set(events.map(ev => offsetToDate(ev.day).getDate()))]; // unique days that have events
+  const eventDays      = [...new Set(events.map(ev => dateToIso(offsetToDate(ev.day))))];
 
   // load all tasks from backend on mount — fall back to hardcoded if backend is down
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function App() {
       await createTask(nev);
       refreshEvents();
     } catch {
-      setEvents(p => [...p, { ...nev, id:Date.now() }]);
+      alert("Failed to save event — is the backend running?");
     }
   };
 
@@ -241,6 +241,7 @@ export default function App() {
               showTip={showTip} tip={tip}
               onDismissTip={() => setShowTip(false)}
               onDontShowTip={() => setShowTip(false)}
+              bedtime={bedtime}
               onBedtimeChange={setBedtime}
             />
             <AIChat

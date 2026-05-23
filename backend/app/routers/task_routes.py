@@ -95,7 +95,7 @@ def get_tasks(db: Session = Depends(get_db)):
             dirty = True
     if dirty:
         db.commit()
-    return db.query(Task).all()
+    return db.query(Task).filter(Task.day >= 0).all()
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
@@ -130,16 +130,17 @@ def update_task(task_id: int, update: TaskUpdate, db: Session = Depends(get_db))
     db.commit()
     db.refresh(task)
 
+    if new_repeat is not None and task.repeat_group_id:
+        stale = (
+            db.query(Task)
+            .filter(Task.repeat_group_id == task.repeat_group_id, Task.id != task.id)
+            .all()
+        )
+        for s in stale:
+            db.delete(s)
+        db.commit()
+
     if new_repeat and new_repeat.get("enabled") and new_repeat.get("days"):
-        if task.repeat_group_id:
-            stale = (
-                db.query(Task)
-                .filter(Task.repeat_group_id == task.repeat_group_id, Task.id != task.id)
-                .all()
-            )
-            for s in stale:
-                db.delete(s)
-            db.commit()
         expand_repeats(task, new_repeat, db)
         db.refresh(task)
 

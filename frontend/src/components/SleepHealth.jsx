@@ -15,8 +15,7 @@ function SleepTip({ tip, onDismiss, onDontShow }) {
   );
 }
 
-export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, onBedtimeChange }) {
-  const [bedtime,   setBedtime]   = useState("23:00");
+export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip, bedtime, onBedtimeChange }) {
   const [waketime,  setWaketime]  = useState("06:40");
   const [goalHours, setGoalHours] = useState(8);
 
@@ -38,7 +37,6 @@ export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip,
 
   // auto-save sleep data and bubble bedtime up whenever any value changes
   useEffect(() => {
-    onBedtimeChange?.(bedtime);
     saveSleepData({
       bedtime,
       wake_time:   waketime,
@@ -88,7 +86,7 @@ export default function SleepHealth({ showTip, tip, onDismissTip, onDontShowTip,
       <div className="sleep-chips">
         <div className="sleep-chip sleep-chip-editable">
           <input className="sleep-time-chip-input" type="time" value={bedtime}
-            onChange={e => setBedtime(e.target.value)}/>
+            onChange={e => onBedtimeChange(e.target.value)}/>
           <div className="sleep-chip-label">Bedtime</div>
         </div>
         <div className="sleep-chip sleep-chip-editable">

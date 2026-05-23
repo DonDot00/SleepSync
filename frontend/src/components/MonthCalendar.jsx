@@ -36,7 +36,8 @@ export default function MonthCalendar({ selectedDate, onSelectDate, eventDays })
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => {
           const isToday  = isCurrent && d === now.getDate();
           const isSel    = isSelected(d);
-          const hasEvent = isCurrent && eventDays.includes(d);
+          const cellIso  = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const hasEvent = eventDays.includes(cellIso);
           return (
             <div key={d}
               onClick={() => onSelectDate(new Date(viewYear, viewMonth, d))}

@@ -29,7 +29,7 @@ def time_to_h(time_str: str) -> float:
 
 @router.post("/")
 def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    tasks        = db.query(Task).all()
+    tasks        = db.query(Task).filter(Task.day >= 0).all()
     sleep_record = db.query(SleepRecord).order_by(SleepRecord.record_date.desc()).first()
 
     schedule_context = {
