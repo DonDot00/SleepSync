@@ -1,3 +1,5 @@
 @echo off
-start "REM Backend" cmd /k "cd /d %~dp0backend && .venv\Scripts\activate && uvicorn app.main:app --reload --port 8000"
-start "REM Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
+cd /d %~dp0backend
+start "REM Backend" cmd /k ".venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000"
+cd /d %~dp0frontend
+start "REM Frontend" cmd /k "npm run dev"
