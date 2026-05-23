@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from typing import List
 from datetime import date, timedelta
 import uuid
@@ -103,12 +104,18 @@ def update_task(task_id: int, update: TaskUpdate, db: Session = Depends(get_db))
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    new_repeat = None
     for key, value in update.model_dump(exclude_none=True).items():
         if key == "repeat" and hasattr(value, "model_dump"):
             value = value.model_dump()
+        if key == "repeat":
+            new_repeat = value
         if key == "day":
             value = int(value) if isinstance(value, int) else 0
         setattr(task, key, value)
+
+    if new_repeat is not None:
+        flag_modified(task, "repeat")
 
     if update.is_missed:
         task.miss_count += 1
@@ -122,6 +129,20 @@ def update_task(task_id: int, update: TaskUpdate, db: Session = Depends(get_db))
 
     db.commit()
     db.refresh(task)
+
+    if new_repeat and new_repeat.get("enabled") and new_repeat.get("days"):
+        if task.repeat_group_id:
+            stale = (
+                db.query(Task)
+                .filter(Task.repeat_group_id == task.repeat_group_id, Task.id != task.id)
+                .all()
+            )
+            for s in stale:
+                db.delete(s)
+            db.commit()
+        expand_repeats(task, new_repeat, db)
+        db.refresh(task)
+
     return task
 
 
