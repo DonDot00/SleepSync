@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls *.py *.bat *.vbs *.sh package*.json)",
+      "Bash(ls frontend/src/assets/)",
+      "Bash(ls backend/app/migrate*.py)",
+      "Bash(ls backend/pyrightconfig.json)"
+    ]
+  }
+}

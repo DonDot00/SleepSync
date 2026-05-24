@@ -1,4 +1,4 @@
-const BASE = "http://localhost:8000";
+const BASE = "";
 
 async function checked(res) {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
