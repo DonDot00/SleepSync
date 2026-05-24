@@ -5,6 +5,7 @@ import os
 import pathlib
 import threading
 import time
+import traceback
 
 multiprocessing.freeze_support()
 
@@ -19,6 +20,7 @@ if not getattr(sys, 'frozen', False):
 DATA_DIR = pathlib.Path(os.environ.get('APPDATA', pathlib.Path.home())) / 'SleepSync'
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILE = DATA_DIR / '.env'
+LOG_FILE = DATA_DIR / 'sleepsync.log'
 os.environ['SLEEPSYNC_DATA_DIR'] = str(DATA_DIR)
 
 # ── First-run: ask for API key ────────────────────────────────────────────────
@@ -83,6 +85,17 @@ if not ENV_FILE.exists():
 from dotenv import load_dotenv
 load_dotenv(ENV_FILE)
 
+# ── Import app now (after env vars are set) so PyInstaller bundles it ─────────
+
+try:
+    import app.main as _app_module
+except Exception:
+    LOG_FILE.write_text(traceback.format_exc(), encoding="utf-8")
+    import tkinter.messagebox as mb
+    mb.showerror("SleepSync Error",
+                 f"Failed to load app.\n\nError log:\n{LOG_FILE}")
+    sys.exit(1)
+
 # ── Open browser once the server is ready ────────────────────────────────────
 
 def _open_browser():
@@ -102,8 +115,10 @@ threading.Thread(target=_open_browser, daemon=True).start()
 
 try:
     import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, log_level="warning")
-except Exception as exc:
+    uvicorn.run(_app_module.app, host="127.0.0.1", port=8000, log_level="warning")
+except Exception:
+    LOG_FILE.write_text(traceback.format_exc(), encoding="utf-8")
     import tkinter.messagebox as mb
-    mb.showerror("SleepSync Error", f"Failed to start:\n\n{exc}")
+    mb.showerror("SleepSync Error",
+                 f"Server crashed.\n\nError log:\n{LOG_FILE}")
     sys.exit(1)
