@@ -18,37 +18,26 @@
 
 ## Quick Start
 
-### Prerequisites
-
-| Tool | Minimum version | Download |
-|---|---|---|
-| Python | 3.11 | https://python.org/downloads — check "Add to PATH" |
-| Node.js | 18 | https://nodejs.org |
-| OpenAI API key | — | https://platform.openai.com/api-keys |
-
 ### Install
 
-```
-git clone https://github.com/YOUR_USERNAME/REM.git
-cd REM
-python setup.py
-```
+1. Download **`SleepSync.exe`** from the [latest release](../../releases/latest)
+2. Double-click it — a setup window will appear asking for your OpenAI API key
+3. Get a free key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys), paste it in, and click **Save & Launch**
+4. Your browser opens automatically to the app
 
-The setup script creates the Python virtual environment, installs all packages, and prompts you for your OpenAI API key.
+That's it. No Python, no Node.js, no terminal.
 
-### Run
-
-Double-click **`Start REM.vbs`**, then open **http://localhost:5173** in your browser.
-
-> Two terminal windows will open — one for the backend (port 8000) and one for the frontend (port 5173). Both need to stay open.
+> Your API key and data are stored locally on your machine at `%AppData%\SleepSync\`.
 
 ### Apple Watch integration (optional)
+
+Requires Python installed on your PC.
 
 ```
 python generate_shortcut.py
 ```
 
-AirDrop the generated `SleepSync.shortcut` file to your iPhone and tap **Add Shortcut**. To automate it: Shortcuts app → Automation → When my alarm stops → Run Shortcut → SleepSync.
+AirDrop the generated `SleepSync.shortcut` to your iPhone and tap **Add Shortcut**. To automate it: Shortcuts app → Automation → When my alarm stops → Run Shortcut → SleepSync.
 
 > Re-run `generate_shortcut.py` if your PC's local IP address changes.
 
@@ -160,12 +149,13 @@ Frontend displays AI message + optionally refreshes calendar
 
 | Layer      | Technology              | Why                                       |
 |------------|-------------------------|-------------------------------------------|
-| Frontend   | React, Vite, Node.js    | Fast dev server, component-based UI       |
+| Frontend   | React, Vite             | Fast build, component-based UI            |
 | Styling    | Plain CSS + Rubik/Syne  | Custom dark theme, no framework overhead  |
 | Backend    | Python + FastAPI        | Fast, typed, auto-generates API docs      |
-| Database   | SQLite + SQLAlchemy     | No required configuration, easy to swap   |
-| AI         | OpenAI GPT-4o-mini      | Fast, cheap, structured JSON output       |
+| Database   | SQLite + SQLAlchemy     | No configuration required, easy to swap  |
+| AI         | OpenAI GPT-40-mini      | Fast, cheap, structured JSON output       |
 | Drag/Drop  | @dnd-kit/core           | Modern React drag-and-drop                |
+| Packaging  | PyInstaller             | Single .exe, no install required          |
 
 ---
 
@@ -195,11 +185,11 @@ This hackathon project covers the core scheduling loop. Here is where SleepSync 
 
 ## Team
 
-**Built with C4's, Celsius, Aulani's and not enough sleep at HackHound — Loyola Maryland, 4/11/2026 to 4/12/2026**
+**Started with C4's, Celsius, Aulani's and not enough sleep at HackHound — Loyola Maryland, 4/11/2026 to 4/12/2026**
 
 | Name             | Role                |
 |------------------|---------------------|
 | Donovan Raymond  | Back End Developer  |
 | Rasheed Mustapha | Front End Developer |
 
-- [⬆️Back to Top](#SleepSync)
+- [⬆️ Back to Top](#sleepsync)
