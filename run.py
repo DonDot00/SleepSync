@@ -114,8 +114,13 @@ threading.Thread(target=_open_browser, daemon=True).start()
 # ── Start server ──────────────────────────────────────────────────────────────
 
 try:
+    # Redirect stdout/stderr to log file — they are None in --windowed exes
+    # and uvicorn's logger crashes trying to call isatty() on None
+    sys.stdout = open(LOG_FILE, "a", encoding="utf-8")
+    sys.stderr = sys.stdout
+
     import uvicorn
-    uvicorn.run(_app_module.app, host="127.0.0.1", port=8000, log_level="warning")
+    uvicorn.run(_app_module.app, host="127.0.0.1", port=8000, log_config=None)
 except Exception:
     LOG_FILE.write_text(traceback.format_exc(), encoding="utf-8")
     import tkinter.messagebox as mb

@@ -40,13 +40,19 @@ print("[3/3] Packaging with PyInstaller...")
 
 for d in (ROOT / "dist", ROOT / "build"):
     if d.exists():
-        shutil.rmtree(d)
+        try:
+            shutil.rmtree(d)
+        except PermissionError:
+            print(f"\nERROR: Cannot delete {d} — SleepSync.exe is still running.")
+            print("Close the app and try again.")
+            sys.exit(1)
 
 run(
     f'"{PY}" -m PyInstaller'
     f' --name SleepSync'
     f' --onefile'
     f' --windowed'
+    f' --paths "{ROOT / "backend"}"'
     f' --add-data "{FRONTEND_DIST};frontend_dist"'
     f' --hidden-import "sqlalchemy.dialects.sqlite"'
     f' --hidden-import "uvicorn.logging"'
