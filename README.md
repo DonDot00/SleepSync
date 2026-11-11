@@ -185,7 +185,7 @@ This hackathon project covers the core scheduling loop. Here is where SleepSync 
 
 ## Team
 
-**Started with C4's, Celsius, Aulani's and not enough sleep at HackHound — Loyola Maryland, 4/11/2026 to 4/12/2026**
+**Startedcd  with C4's, Celsius, Aulani's and not enough sleep at HackHound — Loyola Maryland, 4/11/2026 to 4/12/2026**
 
 | Name             | Role                |
 |------------------|---------------------|
